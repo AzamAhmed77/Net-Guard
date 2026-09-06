@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- Start / Stop Button on the Right Side (Exact red circled area) -->
+    <TextView
+        android:id="@+id/btn_notif_vpn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentRight="true"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="8dp"
+        android:layout_marginLeft="8dp"
+        android:background="@drawable/bg_notif_btn_green"
+        android:gravity="center"
+        android:minHeight="32dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:text="⚡ تشغيل الحماية"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <!-- Left side: Speeds and Daily Data Usage -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentLeft="true"
+        android:layout_toStartOf="@id/btn_notif_vpn"
+        android:layout_toLeftOf="@id/btn_notif_vpn"
+        android:layout_centerVertical="true"
+        android:orientation="vertical">
+
+        <!-- Line 1: Download & Upload Speeds -->
+        <TextView
+            android:id="@+id/tv_notif_line1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="↓ 0.0 KB/s    •    ↑ 0.0 KB/s"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <!-- Line 2: WiFi & Mobile Data Usage -->
+        <TextView
+            android:id="@+id/tv_notif_line2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="واي فاي: 0.0 MB   •   بيانات: 0.0 MB"
+            android:textColor="#A0A0A0"
+            android:textSize="11.5sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+</RelativeLayout>
