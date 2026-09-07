@@ -20,7 +20,7 @@ class RootScreen extends StatefulWidget {
   State<RootScreen> createState() => _RootScreenState();
 }
 
-class _RootScreenState extends State<RootScreen> {
+class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   int _activeTab = 0;
 
   final List<Widget> _tabs = [
@@ -34,7 +34,25 @@ class _RootScreenState extends State<RootScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkInitialPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    final manager = Provider.of<VpnManager>(context, listen: false);
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.detached) {
+      manager.pauseTrafficTicker();
+    } else if (state == AppLifecycleState.resumed) {
+      manager.resumeTrafficTicker();
+    }
   }
 
   Future<void> _checkInitialPermissions() async {

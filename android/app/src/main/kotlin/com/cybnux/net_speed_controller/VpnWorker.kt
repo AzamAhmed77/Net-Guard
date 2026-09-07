@@ -644,7 +644,7 @@ class VpnWorker(private val vpnService: VpnService) {
                     while (running.get()) {
                         pkt = toDeviceQueue.peek()
                         if (pkt == null) {
-                            queueLock.wait(1000)
+                            queueLock.wait()
                             continue
                         }
                         val now = System.currentTimeMillis()
@@ -704,7 +704,7 @@ class VpnWorker(private val vpnService: VpnService) {
                 while (true) { val r = regQueue.poll() ?: break; r() }
 
                 val sel = selector ?: break
-                val selectTimeout = if (rxBytesThisSecond == 0L && txBytesThisSecond == 0L) 1000L else 100L
+                val selectTimeout = if (tcpTable.isEmpty() && udpTable.isEmpty()) 3000L else if (rxBytesThisSecond == 0L && txBytesThisSecond == 0L) 1000L else 100L
                 sel.select(selectTimeout)
 
                 val iter = sel.selectedKeys().iterator()

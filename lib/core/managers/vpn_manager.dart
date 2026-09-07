@@ -1052,6 +1052,17 @@ class VpnManager extends ChangeNotifier {
     });
   }
 
+  void pauseTrafficTicker() {
+    _statsTimer?.cancel();
+    _statsTimer = null;
+  }
+
+  void resumeTrafficTicker() {
+    if (_statsTimer == null) {
+      _startRealTrafficTicker();
+    }
+  }
+
   @override
   void dispose() {
     _statsTimer?.cancel();

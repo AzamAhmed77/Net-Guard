@@ -94,16 +94,16 @@ class NetworkMonitorService : Service() {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_ON -> {
                     isScreenOn = true
-                    Log.d(TAG, "Screen ON: Switching to high-frequency live updates")
-                    reschedule(100) // استيقاظ فوري
+                    Log.d(TAG, "Screen ON: Switching to active updates")
+                    updateNotification(force = true)
+                    reschedule(100) // استيقاظ وتحديث فوري بمجرد فتح الشاشة
                 }
                 Intent.ACTION_SCREEN_OFF -> {
                     isScreenOn = false
-                    Log.d(TAG, "Screen OFF: Switching to smart battery-saving sleep mode")
-                    // صفر السرعة اللحظية المعروضة
+                    Log.d(TAG, "Screen OFF: Switching to deep battery-saving mode (zero notifications)")
                     liveDownBps = 0
                     liveUpBps = 0
-                    reschedule(30000) // سكون عميق 30 ثانية لتوفير البطارية
+                    reschedule(60000) // سكون عميق 60 ثانية لتحديث الاستهلاك اليومي فقط بدون إرسال أي إشعار
                 }
             }
         }
@@ -117,8 +117,8 @@ class NetworkMonitorService : Service() {
                 Log.w(TAG, "Monitor tick error: ${e.message}")
             }
 
-            // جدولة التحديث القادم حسب حالة الشاشة (1.5 ثانية عند فتح الشاشة، 30 ثانية عند الإغلاق)
-            val delay = if (isScreenOn) 1500L else 30000L
+            // جدولة التحديث القادم حسب حالة الشاشة (ثانيتان عند فتح الشاشة، 60 ثانية عند الإغلاق)
+            val delay = if (isScreenOn) 2000L else 60000L
             handler.postDelayed(this, delay)
         }
     }
@@ -342,14 +342,29 @@ class NetworkMonitorService : Service() {
     private var lastNotifiedTimeMs = 0L
 
     fun updateNotification(force: Boolean = false) {
+        // إذا كانت الشاشة مغلقة ولا يوجد طلب إجباري، لا نرسل أي إشعار للنظام نهائياً لتوفير البطارية والسماح للعتاد بالدخول في Deep Sleep
+        if (!isScreenOn && !force) {
+            return
+        }
+
         val now = System.currentTimeMillis()
+        // وضع فاصل زمني لا يقل عن 3.5 ثوانٍ بين تحديثات الإشعار إلا عند الضرورة لتبريد المعالج ومنع إجهاد SystemUI
+        if (!force && (now - lastNotifiedTimeMs < 3500L)) {
+            return
+        }
+
         val notif = buildNotification(liveDownBps, liveUpBps, todayWifiBytes, todayMobileBytes)
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
 
         val contentChanged = (latestLine1 != lastNotifiedLine1 || latestLine2 != lastNotifiedLine2 || latestSubText != lastNotifiedSubText)
-        val heartbeatExpired = (now - lastNotifiedTimeMs >= 15000L)
+        val heartbeatExpired = (now - lastNotifiedTimeMs >= 30000L)
 
-        // لا نرسل الإشعار للنظام إلا إذا تغيرت الأرقام أو مر 15 ثانية — هذا يمنع استنزاف البطارية والمعالج تماماً!
+        // إذا كانت السرعة صفراً ولم يتغير شيء، نتجنب إرسال إشعار متكرر
+        val isIdle = (liveDownBps == 0L && liveUpBps == 0L)
+        if (isIdle && !contentChanged && !force) {
+            return
+        }
+
         if (force || contentChanged || heartbeatExpired || lastNotifiedTimeMs == 0L) {
             lastNotifiedLine1 = latestLine1
             lastNotifiedLine2 = latestLine2
