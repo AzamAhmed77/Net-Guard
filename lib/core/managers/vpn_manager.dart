@@ -146,12 +146,6 @@ class VpnManager extends ChangeNotifier {
     }
     await fetchInstalledApps();
 
-    for (var app in _apps) {
-      if (app.speedMode == 'custom' && (app.customSpeedLimitKbps == 0 || app.customSpeedLimitKbps == 64 || app.customSpeedLimitKbps == 128)) {
-        app.speedMode = 'default';
-        app.customSpeedLimitKbps = 0;
-      }
-    }
 
     try {
       final savedAccent = await StorageService.loadAccentColor();

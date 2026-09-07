@@ -147,15 +147,8 @@ class StorageService {
             final data = appData[app.packageName] as Map<String, dynamic>;
             app.isWifiAllowed = data['wifi'] ?? true;
             app.isMobileAllowed = data['mobile'] ?? true;
-            final savedMode = data['speedMode'] ?? 'default';
-            final savedSpeed = data['customSpeed'] ?? 0;
-            if (savedMode == 'custom' && (savedSpeed == 0 || savedSpeed == 64 || savedSpeed == 128)) {
-              app.speedMode = 'default';
-              app.customSpeedLimitKbps = 0;
-            } else {
-              app.speedMode = savedMode;
-              app.customSpeedLimitKbps = savedSpeed;
-            }
+            app.speedMode = data['speedMode'] ?? 'default';
+            app.customSpeedLimitKbps = data['customSpeed'] ?? 0;
             app.isQuarantined = data['isQuarantined'] ?? false;
           } else if (autoQuarantine) {
             app.isWifiAllowed = false;

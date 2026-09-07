@@ -617,9 +617,11 @@ class _FirewallTabState extends State<FirewallTab> {
     AppStrings strings,
   ) {
     int customKbps = app.customSpeedLimitKbps;
+    String selectedMode = app.speedMode;
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surfaceCardDark,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -627,99 +629,203 @@ class _FirewallTabState extends State<FirewallTab> {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             return Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.only(
+                left: 20, right: 20, top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // App header
                   Row(
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           color: AppColors.surfaceHover,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: app.iconBytes != null
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
                                 child: Image.memory(app.iconBytes!),
                               )
-                            : const Icon(Icons.android, size: 18),
+                            : const Icon(Icons.android, size: 20, color: AppColors.textSecondary),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          app.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              app.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              app.packageName,
+                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 18),
 
-                  // Speed Mode Options
-                  ListTile(
-                    title: Text(strings.presetDefault, style: const TextStyle(color: AppColors.textPrimary)),
-                    subtitle: Text(
-                      strings.isAr ? 'يتبع إعدادات السرعة الرئيسية' : 'Follows main speed limit',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                    leading: const Icon(Icons.settings_backup_restore, color: AppColors.textSecondary),
-                    trailing: app.speedMode == 'default' ? Icon(Icons.check, color: AppColors.accent) : null,
+                  // ── Speed Mode: Default ──
+                  _buildSpeedModeOption(
+                    icon: Icons.settings_backup_restore,
+                    iconColor: AppColors.textSecondary,
+                    title: strings.presetDefault,
+                    subtitle: strings.isAr ? 'يتبع إعدادات السرعة الرئيسية' : 'Follows main speed limit',
+                    isSelected: selectedMode == 'default',
                     onTap: () {
                       vpn.setAppSpeedMode(app, 'default');
                       Navigator.pop(ctx);
                     },
                   ),
-                  ListTile(
-                    title: Text(strings.presetUnlimited, style: const TextStyle(color: AppColors.textPrimary)),
-                    subtitle: Text(
-                      strings.isAr ? 'سرعة قصوى غير مقيدة أبداً' : 'No speed limit applied',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                    leading: Icon(Icons.all_inclusive, color: AppColors.accent),
-                    trailing: app.speedMode == 'unlimited' ? Icon(Icons.check, color: AppColors.accent) : null,
+                  const SizedBox(height: 8),
+
+                  // ── Speed Mode: Unlimited ──
+                  _buildSpeedModeOption(
+                    icon: Icons.all_inclusive,
+                    iconColor: AppColors.accent,
+                    title: strings.presetUnlimited,
+                    subtitle: strings.isAr ? 'سرعة قصوى غير مقيدة أبداً' : 'No speed limit applied',
+                    isSelected: selectedMode == 'unlimited',
                     onTap: () {
                       vpn.setAppSpeedMode(app, 'unlimited');
                       Navigator.pop(ctx);
                     },
                   ),
-                  ListTile(
-                    title: Text(
-                      '${strings.profileCustom}: $customKbps KB/s',
-                      style: const TextStyle(color: AppColors.textPrimary),
-                    ),
-                    subtitle: Slider(
-                      value: customKbps.toDouble().clamp(0.0, 4096.0),
-                      min: 0,
-                      max: 4096,
-                      divisions: 32,
-                      activeColor: AppColors.accent,
-                      inactiveColor: AppColors.surfaceHover,
-                      onChanged: (val) {
-                        setSheetState(() => customKbps = val.toInt());
-                      },
-                    ),
-                    leading: const Icon(Icons.speed, color: Color(0xFFF59E0B)),
-                    trailing: ElevatedButton(
-                      onPressed: () {
-                        vpn.setAppSpeedMode(app, 'custom', customSpeedKbps: customKbps);
-                        Navigator.pop(ctx);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(height: 8),
+
+                  // ── Speed Mode: Custom ──
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: selectedMode == 'custom'
+                          ? const Color(0xFFF59E0B).withOpacity(0.08)
+                          : AppColors.surfaceHover,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: selectedMode == 'custom'
+                            ? const Color(0xFFF59E0B).withOpacity(0.5)
+                            : AppColors.borderDark,
                       ),
-                      child: Text(strings.save),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.speed, color: Color(0xFFF59E0B), size: 20),
+                            const SizedBox(width: 10),
+                            Text(
+                              strings.profileCustom,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: customKbps == 0
+                                    ? AppColors.red.withOpacity(0.15)
+                                    : const Color(0xFFF59E0B).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: customKbps == 0
+                                      ? AppColors.red.withOpacity(0.4)
+                                      : const Color(0xFFF59E0B).withOpacity(0.4),
+                                ),
+                              ),
+                              child: Text(
+                                customKbps == 0
+                                    ? (strings.isAr ? 'كتم كامل' : 'Muted')
+                                    : '$customKbps KB/s',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: customKbps == 0 ? AppColors.red : const Color(0xFFF59E0B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SliderTheme(
+                          data: SliderTheme.of(ctx).copyWith(
+                            activeTrackColor: customKbps == 0 ? AppColors.red : const Color(0xFFF59E0B),
+                            inactiveTrackColor: AppColors.surfaceCardDark,
+                            thumbColor: customKbps == 0 ? AppColors.red : const Color(0xFFF59E0B),
+                            trackHeight: 4,
+                          ),
+                          child: Slider(
+                            value: customKbps.toDouble().clamp(0.0, 4096.0),
+                            min: 0,
+                            max: 4096,
+                            divisions: 128,
+                            onChanged: (val) {
+                              setSheetState(() {
+                                customKbps = val.toInt();
+                                selectedMode = 'custom';
+                              });
+                            },
+                          ),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              strings.isAr ? '0 (كتم)' : '0 (Mute)',
+                              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                            ),
+                            Text(
+                              '4096 KB/s',
+                              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              vpn.setAppSpeedMode(app, 'custom', customSpeedKbps: customKbps);
+                              Navigator.pop(ctx);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF59E0B),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Text(
+                              strings.save,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Divider(color: AppColors.borderDark),
+                  const SizedBox(height: 14),
+                  const Divider(color: AppColors.borderDark, height: 1),
+                  const SizedBox(height: 14),
 
                   // Temporary Pass Section
                   Text(
@@ -781,4 +887,56 @@ class _FirewallTabState extends State<FirewallTab> {
       },
     );
   }
+
+  Widget _buildSpeedModeOption({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accent.withOpacity(0.08) : AppColors.surfaceHover,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.accent.withOpacity(0.5) : AppColors.borderDark,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle, color: AppColors.accent, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+
 }
