@@ -633,18 +633,13 @@ class _HistoryTabState extends State<HistoryTab> {
             ],
           ),
           actions: [
-            TextButton.icon(
-              onPressed: () => Navigator.pop(ctx),
-              icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.red),
-              label: Text(strings.delete, style: const TextStyle(color: AppColors.red)),
-            ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () => Navigator.pop(ctx),
-              child: Text(strings.ok, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: Text(strings.close, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         );

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/themes/app_colors.dart';
+import '../../core/managers/vpn_manager.dart';
+import '../../core/localization/app_strings.dart';
 import '../widgets/glass_card.dart';
 
 class AboutModal extends StatelessWidget {
@@ -7,6 +10,9 @@ class AboutModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vpn = Provider.of<VpnManager>(context, listen: false);
+    final strings = AppStrings(vpn.isArabic);
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(16),
@@ -19,10 +25,10 @@ class AboutModal extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
-                  children: const [
-                    Icon(Icons.info_rounded, color: AppColors.amber, size: 26),
-                    SizedBox(width: 8),
-                    Text('حول Net Guard & الأمان', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  children: [
+                    const Icon(Icons.info_rounded, color: AppColors.amber, size: 26),
+                    const SizedBox(width: 8),
+                    Text(strings.aboutTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 IconButton(
@@ -34,28 +40,28 @@ class AboutModal extends StatelessWidget {
             const SizedBox(height: 12),
             Center(
               child: Column(
-                children: const [
-                  CircleAvatar(
+                children: [
+                  const CircleAvatar(
                     radius: 30,
                     backgroundColor: AppColors.primary,
                     child: Icon(Icons.shield_rounded, size: 36, color: Colors.white),
                   ),
-                  SizedBox(height: 8),
-                  Text('Net Guard Framework v1.0', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text('Network Guardian & Intelligent Traffic Controller', style: TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
+                  const SizedBox(height: 8),
+                  Text(strings.aboutFrameworkVersion, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(strings.aboutFrameworkDesc, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'نظام بيئي سيبراني محلي يعتمد على مبادئ الثقة الصفرية (Zero-Trust) ومعالجة الحزم على مستوى النواة (Kernel-Level) دون الحاجة لأي خوادم خارجية لحماية الخصوصية المطلقة 100%.',
-              style: TextStyle(fontSize: 12, height: 1.5),
+            Text(
+              strings.aboutBody,
+              style: const TextStyle(fontSize: 12, height: 1.5),
             ),
             const SizedBox(height: 16),
             const Divider(color: AppColors.borderDark),
             const SizedBox(height: 8),
-            const Center(
-              child: Text('© 2027 Net Guard Security. جميع الحقوق محفوظة.', style: TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
+            Center(
+              child: Text(strings.aboutCopyright, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
             ),
           ],
         ),

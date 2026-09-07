@@ -72,13 +72,17 @@ class AppInfo {
       } catch (_) {}
     }
 
-    final isTrackerSuspicious = pkg.contains('ad') ||
-        pkg.contains('tracker') ||
-        pkg.contains('analytics') ||
-        pkg.contains('facebook') ||
-        pkg.contains('tiktok') ||
-        pkg.contains('snapchat') ||
-        pkg.contains('game');
+    final pkgLower = pkg.toLowerCase();
+    final segments = pkgLower.split('.');
+
+    // Only flag apps that contain known ad/tracker SDK segments — not partial matches
+    const trackerSegments = {
+      'admob', 'adcolony', 'applovin', 'ironsrc', 'vungle',
+      'mopub', 'inmobi', 'chartboost', 'unityads', 'appsflyer',
+      'adjust', 'analytics', 'tracker', 'adware', 'spyware',
+    };
+
+    final isTrackerSuspicious = segments.any((s) => trackerSegments.contains(s));
 
     return AppInfo(
       name: name,

@@ -817,7 +817,6 @@ class VpnManager extends ChangeNotifier {
   }
 
   void syncNativeSettings() {
-    _persistState();
     final List<String> blockedWifiApps = [];
     final List<String> blockedDataApps = [];
     final List<String> allowedFirewallApps = [];

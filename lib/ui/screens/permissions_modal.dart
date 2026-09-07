@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/themes/app_colors.dart';
 import '../../core/services/method_channel_service.dart';
+import '../../core/managers/vpn_manager.dart';
+import '../../core/localization/app_strings.dart';
 
 class PermissionsModal extends StatefulWidget {
   const PermissionsModal({super.key});
@@ -52,6 +55,9 @@ class _PermissionsModalState extends State<PermissionsModal>
 
   @override
   Widget build(BuildContext context) {
+    final vpn = Provider.of<VpnManager>(context, listen: false);
+    final strings = AppStrings(vpn.isArabic);
+
     final bool allOptimal = _permissions['usageStats'] == true &&
         _permissions['batteryOptimization'] == true &&
         _permissions['notification'] == true;
@@ -103,22 +109,22 @@ class _PermissionsModalState extends State<PermissionsModal>
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'صلاحيات وأذونات النظام',
-                          style: TextStyle(
+                          strings.permissionsTitle,
+                          style: const TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          'تكامل عالي الأداء مع نظام أندرويد',
-                          style: TextStyle(
+                          strings.permissionsSubtitle,
+                          style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,
                           ),
@@ -157,9 +163,7 @@ class _PermissionsModalState extends State<PermissionsModal>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      allOptimal
-                          ? 'جميع الصلاحيات ممنوحة! التطبيق يعمل بأعلى كفاءة وسجلات حقيقية 100%.'
-                          : 'امنح الصلاحيات التالية لتفعيل السجل الحقيقي من الجوال والعمل بالخلفية.',
+                      allOptimal ? strings.permAllGranted : strings.permNotGranted,
                       style: TextStyle(
                         color: allOptimal ? AppColors.green : AppColors.amber,
                         fontSize: 11.5,
@@ -187,11 +191,10 @@ class _PermissionsModalState extends State<PermissionsModal>
                         _buildPermissionTile(
                           icon: Icons.analytics_outlined,
                           color: AppColors.accent,
-                          title: 'الوصول لبيانات الاستخدام (Usage Stats)',
-                          description:
-                              'لقراءة استهلاك الإنترنت الحقيقي والدقيق لكل تطبيق من نظام أندرويد مباشرة (NetworkStatsManager).',
+                          title: strings.permUsageTitle,
+                          description: strings.permUsageDesc,
                           isGranted: _permissions['usageStats'] == true,
-                          actionLabel: 'تفعيل السجل الحقيقي',
+                          actionLabel: strings.permUsageAction,
                           onAction: () async {
                             await MethodChannelService.requestUsageStatsPermission();
                           },
@@ -200,11 +203,10 @@ class _PermissionsModalState extends State<PermissionsModal>
                         _buildPermissionTile(
                           icon: Icons.battery_saver_outlined,
                           color: AppColors.green,
-                          title: 'استثناء تحسين البطارية (Background Work)',
-                          description:
-                              'لمنع أندروID من إيقاف الخدمة في الخلفية وضمان ثبات السرعات وحظر التطبيقات.',
+                          title: strings.permBatteryTitle,
+                          description: strings.permBatteryDesc,
                           isGranted: _permissions['batteryOptimization'] == true,
-                          actionLabel: 'استثناء البطارية',
+                          actionLabel: strings.permBatteryAction,
                           onAction: () async {
                             await MethodChannelService.requestBatteryOptimization();
                           },
@@ -213,11 +215,10 @@ class _PermissionsModalState extends State<PermissionsModal>
                         _buildPermissionTile(
                           icon: Icons.notifications_none_outlined,
                           color: AppColors.primaryLight,
-                          title: 'إشعارات الخدمة المباشرة (Notifications)',
-                          description:
-                              'لعرض عداد سرعة النت اللحظي وحالة الحماية في شريط الإشعارات بدون انقطاع.',
+                          title: strings.permNotifTitle,
+                          description: strings.permNotifDesc,
                           isGranted: _permissions['notification'] == true,
-                          actionLabel: 'تفعيل الإشعارات',
+                          actionLabel: strings.permNotifAction,
                           onAction: () async {
                             await MethodChannelService.requestNotificationPermission();
                           },
@@ -226,11 +227,10 @@ class _PermissionsModalState extends State<PermissionsModal>
                         _buildPermissionTile(
                           icon: Icons.vpn_key_outlined,
                           color: AppColors.accent,
-                          title: 'ترخيص خدمة الشبكة (VPN Permission)',
-                          description:
-                              'مطلوب للتحكم في سرعة التطبيقات وحظر الإعلانات وفلترة DNS.',
+                          title: strings.permVpnTitle,
+                          description: strings.permVpnDesc,
                           isGranted: _permissions['vpn'] == true,
-                          actionLabel: 'مُفعّل بالنظام',
+                          actionLabel: strings.permVpnAction,
                           onAction: null,
                         ),
                         if (_permissions['usageStats'] != true) ...[
@@ -245,24 +245,26 @@ class _PermissionsModalState extends State<PermissionsModal>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Row(
+                                Row(
                                   children: [
-                                    Icon(Icons.help_outline_rounded, color: Colors.amber, size: 16),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'إذا كان الإذن رمادياً أو معطلاً (أندرويد 13 فما فوق):',
-                                      style: TextStyle(
-                                        color: Colors.amber,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                                    const Icon(Icons.help_outline_rounded, color: Colors.amber, size: 16),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        strings.permRestrictedHelpTitle,
+                                        style: const TextStyle(
+                                          color: Colors.amber,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
-                                  'لحمايتك، يُقيد أندرويد أذونات التطبيقات المرسلة خارج المتجر تلقائياً.\nالحل: افتح معلومات التطبيق بالزر أدناه ⬅️ اضغط الثلاث نقاط (⋮) أعلى الشاشة ⬅️ اختر "السماح بالإعدادات المقيدة" (Allow restricted settings).',
-                                  style: TextStyle(
+                                Text(
+                                  strings.permRestrictedHelpBody,
+                                  style: const TextStyle(
                                     color: AppColors.textSecondary,
                                     fontSize: 11,
                                     height: 1.4,
@@ -275,7 +277,7 @@ class _PermissionsModalState extends State<PermissionsModal>
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        '⚙️ فتح معلومات التطبيق لفك القيد',
+                                        strings.permOpenAppInfo,
                                         style: TextStyle(
                                           color: AppColors.accent,
                                           fontSize: 11.5,
@@ -313,9 +315,9 @@ class _PermissionsModalState extends State<PermissionsModal>
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.textSecondary),
-                      label: const Text(
-                        'تحديث الحالة',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      label: Text(
+                        strings.permRefreshStatus,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                       ),
                       onPressed: _checkPermissions,
                     ),
@@ -333,9 +335,9 @@ class _PermissionsModalState extends State<PermissionsModal>
                         elevation: 0,
                       ),
                       onPressed: () => Navigator.pop(context),
-                      child: const Text(
-                        'تم',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      child: Text(
+                        strings.permDone,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -357,6 +359,9 @@ class _PermissionsModalState extends State<PermissionsModal>
     required String actionLabel,
     VoidCallback? onAction,
   }) {
+    final vpn = Provider.of<VpnManager>(context, listen: false);
+    final strings = AppStrings(vpn.isArabic);
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -410,7 +415,7 @@ class _PermissionsModalState extends State<PermissionsModal>
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      isGranted ? 'ممنوح ✓' : 'مطلوب',
+                      isGranted ? strings.permGranted : strings.permRequired,
                       style: TextStyle(
                         color: isGranted ? AppColors.green : AppColors.amber,
                         fontSize: 11,

@@ -218,4 +218,55 @@ class AppStrings {
   String get clearLogs => isAr ? 'مسح السجل' : 'Clear Logs';
   String get systemPermissions => isAr ? 'صلاحيات وأذونات النظام' : 'System Permissions';
   String get diagnostics => isAr ? 'تشخيص وإصلاح الأعطال' : 'Service Self-Healing Diagnostics';
+
+  // ── Permissions Modal ──
+  String get permissionsTitle => isAr ? 'صلاحيات وأذونات النظام' : 'System Permissions';
+  String get permissionsSubtitle => isAr ? 'تكامل عالي الأداء مع نظام أندرويد' : 'High-performance Android integration';
+  String get permAllGranted => isAr
+      ? 'جميع الصلاحيات ممنوحة! التطبيق يعمل بأعلى كفاءة وسجلات حقيقية 100%.'
+      : 'All permissions granted! App running at full efficiency with real logs.';
+  String get permNotGranted => isAr
+      ? 'امنح الصلاحيات التالية لتفعيل السجل الحقيقي من الجوال والعمل بالخلفية.'
+      : 'Grant the following permissions to enable real usage logs and background operation.';
+  String get permUsageTitle => isAr ? 'الوصول لبيانات الاستخدام (Usage Stats)' : 'Usage Data Access (Usage Stats)';
+  String get permUsageDesc => isAr
+      ? 'لقراءة استهلاك الإنترنت الحقيقي والدقيق لكل تطبيق من نظام أندرويد مباشرة (NetworkStatsManager).'
+      : 'Read real per-app internet usage directly from Android (NetworkStatsManager).';
+  String get permUsageAction => isAr ? 'تفعيل السجل الحقيقي' : 'Enable Real Logs';
+  String get permBatteryTitle => isAr ? 'استثناء تحسين البطارية (Background Work)' : 'Battery Optimization Exemption';
+  String get permBatteryDesc => isAr
+      ? 'لمنع أندرويد من إيقاف الخدمة في الخلفية وضمان ثبات السرعات وحظر التطبيقات.'
+      : 'Prevent Android from stopping background services to ensure stable speed control.';
+  String get permBatteryAction => isAr ? 'استثناء البطارية' : 'Exempt Battery';
+  String get permNotifTitle => isAr ? 'إشعارات الخدمة المباشرة (Notifications)' : 'Live Service Notifications';
+  String get permNotifDesc => isAr
+      ? 'لعرض عداد سرعة النت اللحظي وحالة الحماية في شريط الإشعارات بدون انقطاع.'
+      : 'Display live speed meter and protection status in the notification bar.';
+  String get permNotifAction => isAr ? 'تفعيل الإشعارات' : 'Enable Notifications';
+  String get permVpnTitle => isAr ? 'ترخيص خدمة الشبكة (VPN Permission)' : 'Network Service License (VPN)';
+  String get permVpnDesc => isAr
+      ? 'مطلوب للتحكم في سرعة التطبيقات وحظر الإعلانات وفلترة DNS.'
+      : 'Required for app speed control, ad blocking, and DNS filtering.';
+  String get permVpnAction => isAr ? 'مُفعّل بالنظام' : 'Enabled by System';
+  String get permGranted => isAr ? 'ممنوح ✓' : 'Granted ✓';
+  String get permRequired => isAr ? 'مطلوب' : 'Required';
+  String get permRefreshStatus => isAr ? 'تحديث الحالة' : 'Refresh Status';
+  String get permDone => isAr ? 'تم' : 'Done';
+  String get permRestrictedHelpTitle => isAr
+      ? 'إذا كان الإذن رمادياً أو معطلاً (أندرويد 13 فما فوق):'
+      : 'If the permission is greyed out (Android 13+):';
+  String get permRestrictedHelpBody => isAr
+      ? 'لحمايتك، يُقيد أندرويد أذونات التطبيقات المرسلة خارج المتجر تلقائياً.\nالحل: افتح معلومات التطبيق بالزر أدناه ⬅️ اضغط الثلاث نقاط (⋮) أعلى الشاشة ⬅️ اختر "السماح بالإعدادات المقيدة" (Allow restricted settings).'
+      : 'Android restricts permissions for sideloaded apps.\nFix: Open app info below ⬅️ Tap the 3-dot menu (⋮) ⬅️ Choose "Allow restricted settings".';
+  String get permOpenAppInfo => isAr ? '⚙️ فتح معلومات التطبيق لفك القيد' : '⚙️ Open App Info to remove restriction';
+
+  // ── About Modal ──
+  String get aboutTitle => isAr ? 'حول Net Guard والأمان' : 'About Net Guard & Security';
+  String get aboutVersion => isAr ? 'حول والإصدار' : 'About & Version';
+  String get aboutFrameworkVersion => 'Net Guard Framework v1.0';
+  String get aboutFrameworkDesc => isAr ? 'حارس الشبكة والتحكم الذكي بحركة المرور' : 'Network Guardian & Intelligent Traffic Controller';
+  String get aboutBody => isAr
+      ? 'نظام بيئي سيبراني محلي يعتمد على مبادئ الثقة الصفرية (Zero-Trust) ومعالجة الحزم على مستوى النواة (Kernel-Level) دون الحاجة لأي خوادم خارجية لحماية الخصوصية المطلقة 100%.'
+      : 'A local cybersecurity ecosystem built on Zero-Trust principles and Kernel-Level packet processing, requiring no external servers for 100% absolute privacy protection.';
+  String get aboutCopyright => isAr ? '© 2025 Net Guard Security. جميع الحقوق محفوظة.' : '© 2025 Net Guard Security. All rights reserved.';
 }
