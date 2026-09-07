@@ -817,6 +817,7 @@ class VpnManager extends ChangeNotifier {
   }
 
   void syncNativeSettings() {
+    _persistState();
     final List<String> blockedWifiApps = [];
     final List<String> blockedDataApps = [];
     final List<String> allowedFirewallApps = [];
@@ -938,7 +939,7 @@ class VpnManager extends ChangeNotifier {
     final timeStr =
         "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}";
     _terminalLogs.insert(0, {"time": timeStr, "level": level, "msg": message});
-    if (_terminalLogs.length > 150) _terminalLogs.removeLast();
+    if (_terminalLogs.length > 500) _terminalLogs.removeLast();
     notifyListeners();
   }
 

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/managers/vpn_manager.dart';
 import '../../core/themes/app_colors.dart';
+import '../../core/localization/app_strings.dart';
 import '../widgets/glass_card.dart';
 
 class ExpertSettingsModal extends StatefulWidget {
-  const ExpertSettingsModal({Key? key}) : super(key: key);
+  const ExpertSettingsModal({super.key});
 
   @override
   State<ExpertSettingsModal> createState() => _ExpertSettingsModalState();
@@ -15,6 +16,7 @@ class _ExpertSettingsModalState extends State<ExpertSettingsModal> {
   @override
   Widget build(BuildContext context) {
     final manager = Provider.of<VpnManager>(context);
+    final strings = AppStrings(manager.isArabic);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -30,10 +32,10 @@ class _ExpertSettingsModalState extends State<ExpertSettingsModal> {
                 children: [
                   const Icon(Icons.tune_rounded, color: AppColors.primaryLight, size: 22),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'الإعدادات المتقدمة (Expert Settings)',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      strings.expertSettingsTitle,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
@@ -49,39 +51,45 @@ class _ExpertSettingsModalState extends State<ExpertSettingsModal> {
               const SizedBox(height: 14),
 
               _buildOptionRow(
-                title: 'وحدة تسريع النواة eBPF Kernel',
-                subtitle: 'فلترة الحزم وتقييد السرعة داخل Kernel Space لتوفير البطارية',
+                title: strings.ebpfTitle,
+                subtitle: strings.ebpfDesc,
                 value: manager.config.ebpfEnabled,
                 onChanged: (val) {
                   setState(() => manager.config.ebpfEnabled = val);
                   manager.syncNativeSettings();
-                  manager.addLog("INFO", "تم ${val ? 'تفعيل' : 'إيقاف'} وحدة eBPF Kernel.");
+                  manager.addLog("INFO", manager.isArabic 
+                      ? "تم ${val ? 'تفعيل' : 'إيقاف'} وحدة eBPF Kernel."
+                      : "${val ? 'Enabled' : 'Disabled'} eBPF Kernel module.");
                 },
               ),
 
               const Divider(color: AppColors.borderDark, height: 20),
 
               _buildOptionRow(
-                title: 'تحليل الحزم العميق (DPI Inspection)',
-                subtitle: 'تحليل أنواع حركة المرور وتطبيق قواعد جودة الخدمة QoS',
+                title: strings.dpiTitle,
+                subtitle: strings.dpiDesc,
                 value: manager.config.dpiEnabled,
                 onChanged: (val) {
                   setState(() => manager.config.dpiEnabled = val);
                   manager.syncNativeSettings();
-                  manager.addLog("INFO", "تم ${val ? 'تفعيل' : 'إيقاف'} وحدة DPI.");
+                  manager.addLog("INFO", manager.isArabic
+                      ? "تم ${val ? 'تفعيل' : 'إيقاف'} وحدة DPI."
+                      : "${val ? 'Enabled' : 'Disabled'} DPI Inspection module.");
                 },
               ),
 
               const Divider(color: AppColors.borderDark, height: 20),
 
               _buildOptionRow(
-                title: 'حماية DNS Rebinding Protection',
-                subtitle: 'منع البرمجيات الخبيثة من استغلال الشبكات المحلية',
+                title: strings.dnsRebindingTitle,
+                subtitle: strings.dnsRebindingDesc,
                 value: manager.config.dnsRebindingProtection,
                 onChanged: (val) {
                   setState(() => manager.config.dnsRebindingProtection = val);
                   manager.syncNativeSettings();
-                  manager.addLog("INFO", "تم ${val ? 'تفعيل' : 'إيقاف'} حماية DNS Rebinding.");
+                  manager.addLog("INFO", manager.isArabic
+                      ? "تم ${val ? 'تفعيل' : 'إيقاف'} حماية DNS Rebinding."
+                      : "${val ? 'Enabled' : 'Disabled'} DNS Rebinding Protection.");
                 },
               ),
             ],
@@ -114,7 +122,7 @@ class _ExpertSettingsModalState extends State<ExpertSettingsModal> {
           scale: 0.8,
           child: Switch(
             value: value,
-            activeColor: AppColors.green,
+            activeTrackColor: AppColors.green,
             onChanged: onChanged,
           ),
         ),

@@ -119,10 +119,10 @@ class AppStrings {
   String get allowAll => isAr ? 'السماح للكل' : 'Allow All';
   String get blockAll => isAr ? 'حظر الكل' : 'BLOCK ALL';
   String get blockAllDesc => isAr ? 'حظر جميع التطبيقات تلقائياً، والاستثناء يدوي' : 'Block all apps by default, whitelist manually';
-  String get enableSchedule => isAr ? 'تفعيل الجدولة الذكية' : 'Enable Schedule';
-  String get scheduleDesc => isAr ? 'تفعيل القواعد تلقائياً في ساعات محددة' : 'Automatically activate rules in set hours';
-  String get fromHour => isAr ? 'من الساعة' : 'From';
-  String get toHour => isAr ? 'حتى الساعة' : 'To';
+  String get enableSchedule => isAr ? 'جدولة حظر الإنترنت' : 'Schedule Internet Block';
+  String get scheduleDesc => isAr ? 'قطع الإنترنت تلقائياً خلال الفترة المحددة أدناه' : 'Automatically block internet during the period below';
+  String get fromHour => isAr ? 'بداية الحظر' : 'Block From';
+  String get toHour => isAr ? 'نهاية الحظر' : 'Block Until';
   String get autoQuarantine => isAr ? 'عزل التطبيقات الجديدة تلقائياً' : 'Auto-Quarantine New Apps';
   String get autoQuarantineDesc => isAr ? 'حظر أي تطبيق جديد يتم تثبيته فوراً' : 'Immediately block newly installed apps';
   String get lockdownScreenOff => isAr ? 'حظر عند قفل الشاشة' : 'Lockdown on Screen Off';
@@ -216,6 +216,8 @@ class AppStrings {
   String get liveEventLogs => isAr ? 'سجل الأحداث المباشر' : 'Live Event Logs';
   String get noLogsYet => isAr ? 'لا توجد أحداث جديدة.' : 'No new events.';
   String get clearLogs => isAr ? 'مسح السجل' : 'Clear Logs';
+  String get exportLogs => isAr ? 'تصدير السجل' : 'Export Logs';
+  String get logsCopied => isAr ? 'تم نسخ السجلات إلى الحافظة بنجاح' : 'Logs copied to clipboard successfully';
   String get systemPermissions => isAr ? 'صلاحيات وأذونات النظام' : 'System Permissions';
   String get diagnostics => isAr ? 'تشخيص وإصلاح الأعطال' : 'Service Self-Healing Diagnostics';
 
@@ -262,11 +264,21 @@ class AppStrings {
 
   // ── About Modal ──
   String get aboutTitle => isAr ? 'حول Net Guard والأمان' : 'About Net Guard & Security';
-  String get aboutVersion => isAr ? 'حول والإصدار' : 'About & Version';
   String get aboutFrameworkVersion => 'Net Guard Framework v1.0';
   String get aboutFrameworkDesc => isAr ? 'حارس الشبكة والتحكم الذكي بحركة المرور' : 'Network Guardian & Intelligent Traffic Controller';
+  String get revoke => isAr ? 'إلغاء' : 'Revoke';
+  String minRemaining(int minutes) => isAr ? 'متبقي $minutes دقيقة' : '$minutes min remaining';
   String get aboutBody => isAr
       ? 'نظام بيئي سيبراني محلي يعتمد على مبادئ الثقة الصفرية (Zero-Trust) ومعالجة الحزم على مستوى النواة (Kernel-Level) دون الحاجة لأي خوادم خارجية لحماية الخصوصية المطلقة 100%.'
       : 'A local cybersecurity ecosystem built on Zero-Trust principles and Kernel-Level packet processing, requiring no external servers for 100% absolute privacy protection.';
   String get aboutCopyright => isAr ? '© 2025 Net Guard Security. جميع الحقوق محفوظة.' : '© 2025 Net Guard Security. All rights reserved.';
+
+  // ── Expert Settings Modal ──
+  String get expertSettingsTitle => isAr ? 'الإعدادات المتقدمة (Expert Settings)' : 'Expert Settings';
+  String get ebpfTitle => isAr ? 'وحدة تسريع النواة eBPF Kernel' : 'eBPF Kernel Acceleration';
+  String get ebpfDesc => isAr ? 'فلترة الحزم وتقييد السرعة داخل Kernel Space لتوفير البطارية' : 'Kernel-level packet filtering & throttling to save battery';
+  String get dpiTitle => isAr ? 'تحليل الحزم العميق (DPI Inspection)' : 'Deep Packet Inspection (DPI)';
+  String get dpiDesc => isAr ? 'تحليل أنواع حركة المرور وتطبيق قواعد جودة الخدمة QoS' : 'Analyze traffic protocols and apply QoS rules';
+  String get dnsRebindingTitle => isAr ? 'حماية DNS Rebinding Protection' : 'DNS Rebinding Protection';
+  String get dnsRebindingDesc => isAr ? 'منع البرمجيات الخبيثة من استغلال الشبكات المحلية' : 'Prevent malicious scripts from attacking local networks';
 }

@@ -518,15 +518,15 @@ class _FirewallTabState extends State<FirewallTab> {
                 const Icon(Icons.timer_outlined, size: 12, color: Color(0xFF00E5FF)),
                 const SizedBox(width: 4),
                 Text(
-                  '${strings.tempPass}: ${app.remainingTempMinutes} min remaining',
+                  '${strings.tempPass}: ${strings.minRemaining(app.remainingTempMinutes)}',
                   style: const TextStyle(fontSize: 10, color: Color(0xFF00E5FF)),
                 ),
                 const Spacer(),
                 GestureDetector(
                   onTap: () => vpn.revokeTemporaryPass(app),
-                  child: const Text(
-                    'Revoke',
-                    style: TextStyle(fontSize: 10, color: AppColors.red),
+                  child: Text(
+                    strings.revoke,
+                    style: const TextStyle(fontSize: 10, color: AppColors.red),
                   ),
                 ),
               ],

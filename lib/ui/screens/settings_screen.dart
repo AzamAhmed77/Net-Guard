@@ -5,9 +5,11 @@ import '../../core/localization/app_strings.dart';
 import '../../core/managers/vpn_manager.dart';
 import 'permissions_modal.dart';
 import 'about_modal.dart';
+import 'expert_settings_modal.dart';
+import 'live_logs_modal.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   static const List<Color> _accentColors = [
     Color(0xFF10B981), // Emerald
@@ -348,6 +350,24 @@ class SettingsScreen extends StatelessWidget {
                 onTap: () => showDialog(
                   context: context,
                   builder: (_) => const PermissionsModal(),
+                ),
+              ),
+              const Divider(color: AppColors.borderDark, height: 1),
+              _buildActionTile(
+                icon: Icons.tune_rounded,
+                title: strings.expertSettingsTitle,
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => const ExpertSettingsModal(),
+                ),
+              ),
+              const Divider(color: AppColors.borderDark, height: 1),
+              _buildActionTile(
+                icon: Icons.terminal_rounded,
+                title: strings.liveEventLogs,
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => const LiveLogsModal(),
                 ),
               ),
               const Divider(color: AppColors.borderDark, height: 1),

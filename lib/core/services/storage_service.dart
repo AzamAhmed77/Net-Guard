@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/vpn_config.dart';
 import '../models/app_info.dart';
@@ -104,7 +105,9 @@ class StorageService {
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = json.encode(config.toJson());
       await prefs.setString(_keyConfig, jsonStr);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[StorageService] saveConfig error: $e');
+    }
   }
 
   static Future<VpnConfig?> loadConfig() async {
@@ -115,7 +118,9 @@ class StorageService {
         final Map<String, dynamic> map = json.decode(jsonStr);
         return VpnConfig.fromJson(map);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[StorageService] loadConfig error: $e');
+    }
     return null;
   }
 
@@ -133,7 +138,9 @@ class StorageService {
         };
       }
       await prefs.setString(_keyAppSettings, json.encode(appData));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[StorageService] saveAppSettings error: $e');
+    }
   }
 
   static Future<void> applySavedAppSettings(List<AppInfo> apps, {bool autoQuarantine = false}) async {
@@ -157,7 +164,9 @@ class StorageService {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[StorageService] applySavedAppSettings error: $e');
+    }
   }
 
   static Future<void> saveCustomProfileSettings(
@@ -183,7 +192,9 @@ class StorageService {
       await prefs.setInt(_keyCustomDownloadLimit, dlLimit);
       await prefs.setInt(_keyCustomUploadLimit, ulLimit);
       await prefs.setBool('cybnux_has_custom_profile', true);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[StorageService] saveCustomProfileSettings error: $e');
+    }
   }
 
   static Future<bool> hasSavedCustomProfile() async {
@@ -232,7 +243,9 @@ class StorageService {
         await saveAppSettings(apps);
         return modifiedCount;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[StorageService] restoreCustomProfileSettings error: $e');
+    }
     return -1;
   }
 

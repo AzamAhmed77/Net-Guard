@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class MethodChannelService {
@@ -53,7 +54,7 @@ class MethodChannelService {
       });
       return success;
     } on PlatformException catch (e) {
-      print("فشل تشغيل VPN: '${e.message}'.");
+      debugPrint("VPN start failed: '${e.message}'.");
       return false;
     }
   }
@@ -63,7 +64,7 @@ class MethodChannelService {
       final bool success = await _channel.invokeMethod('stopVpn');
       return success;
     } on PlatformException catch (e) {
-      print("فشل إيقاف VPN: '${e.message}'.");
+      debugPrint("VPN stop failed: '${e.message}'.");
       return false;
     }
   }
@@ -171,7 +172,7 @@ class MethodChannelService {
         'lockdownScreenOff': lockdownScreenOff,
       });
     } on PlatformException catch (e) {
-      print("فشل تحديث الإعدادات: '${e.message}'.");
+      debugPrint("Failed to update settings: '${e.message}'.");
     }
   }
 
