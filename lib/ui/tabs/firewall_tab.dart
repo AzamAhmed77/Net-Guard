@@ -6,7 +6,7 @@ import '../../core/themes/app_colors.dart';
 import '../../core/localization/app_strings.dart';
 
 class FirewallTab extends StatefulWidget {
-  const FirewallTab({Key? key}) : super(key: key);
+  const FirewallTab({super.key});
 
   @override
   State<FirewallTab> createState() => _FirewallTabState();
@@ -102,9 +102,9 @@ class _FirewallTabState extends State<FirewallTab> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.accent.withOpacity(0.15),
+                          color: AppColors.accent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+                          border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           _formatMb(totalAppsUsage),
@@ -339,7 +339,7 @@ class _FirewallTabState extends State<FirewallTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: color != null ? color.withOpacity(0.15) : AppColors.surfaceDark,
+          color: color != null ? color.withValues(alpha: 0.15) : AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: color ?? AppColors.borderDark),
         ),
@@ -376,7 +376,7 @@ class _FirewallTabState extends State<FirewallTab> {
         border: Border.all(
           color: app.isSelected
               ? AppColors.accent
-              : (isBlocked ? AppColors.red.withOpacity(0.3) : AppColors.borderDark),
+              : (isBlocked ? AppColors.red.withValues(alpha: 0.3) : AppColors.borderDark),
         ),
       ),
       child: Column(
@@ -558,10 +558,10 @@ class _FirewallTabState extends State<FirewallTab> {
         height: 36,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isActive ? AppColors.accent.withOpacity(0.15) : AppColors.surfaceHover,
+          color: isActive ? AppColors.accent.withValues(alpha: 0.15) : AppColors.surfaceHover,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isActive ? AppColors.accent.withOpacity(0.4) : AppColors.borderDark,
+            color: isActive ? AppColors.accent.withValues(alpha: 0.4) : AppColors.borderDark,
           ),
         ),
         child: Icon(
@@ -750,12 +750,12 @@ class _FirewallTabState extends State<FirewallTab> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: selectedMode == 'custom'
-                          ? const Color(0xFFF59E0B).withOpacity(0.08)
+                          ? const Color(0xFFF59E0B).withValues(alpha: 0.08)
                           : AppColors.surfaceHover,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: selectedMode == 'custom'
-                            ? const Color(0xFFF59E0B).withOpacity(0.5)
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.5)
                             : AppColors.borderDark,
                       ),
                     ),
@@ -779,13 +779,13 @@ class _FirewallTabState extends State<FirewallTab> {
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: customKbps == 0
-                                    ? AppColors.red.withOpacity(0.15)
-                                    : const Color(0xFFF59E0B).withOpacity(0.15),
+                                    ? AppColors.red.withValues(alpha: 0.15)
+                                    : const Color(0xFFF59E0B).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: customKbps == 0
-                                      ? AppColors.red.withOpacity(0.4)
-                                      : const Color(0xFFF59E0B).withOpacity(0.4),
+                                      ? AppColors.red.withValues(alpha: 0.4)
+                                      : const Color(0xFFF59E0B).withValues(alpha: 0.4),
                                 ),
                               ),
                               child: Text(
@@ -829,9 +829,9 @@ class _FirewallTabState extends State<FirewallTab> {
                               strings.isAr ? '0 (كتم)' : '0 (Mute)',
                               style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                             ),
-                            Text(
+                            const Text(
                               '\u200E4096 KB/s',
-                              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                              style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -991,10 +991,10 @@ class _FirewallTabState extends State<FirewallTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.accent.withOpacity(0.08) : AppColors.surfaceHover,
+          color: isSelected ? AppColors.accent.withValues(alpha: 0.08) : AppColors.surfaceHover,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? AppColors.accent.withOpacity(0.5) : AppColors.borderDark,
+            color: isSelected ? AppColors.accent.withValues(alpha: 0.5) : AppColors.borderDark,
           ),
         ),
         child: Row(

@@ -5,7 +5,7 @@ import '../../core/themes/app_colors.dart';
 import '../../core/localization/app_strings.dart';
 
 class DashboardTab extends StatefulWidget {
-  const DashboardTab({Key? key}) : super(key: key);
+  const DashboardTab({super.key});
 
   @override
   State<DashboardTab> createState() => _DashboardTabState();
@@ -55,7 +55,7 @@ class _DashboardTabState extends State<DashboardTab> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.accent.withOpacity(0.15),
+                          color: AppColors.accent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
@@ -311,7 +311,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     activeTrackColor: AppColors.accent,
                     inactiveTrackColor: AppColors.surfaceHover,
                     thumbColor: AppColors.accent,
-                    overlayColor: AppColors.accent.withOpacity(0.2),
+                    overlayColor: AppColors.accent.withValues(alpha: 0.2),
                     trackHeight: 4,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
                   ),
@@ -392,7 +392,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     activeTrackColor: AppColors.accent,
                     inactiveTrackColor: AppColors.surfaceHover,
                     thumbColor: AppColors.accent,
-                    overlayColor: AppColors.accent.withOpacity(0.2),
+                    overlayColor: AppColors.accent.withValues(alpha: 0.2),
                     trackHeight: 4,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
                   ),

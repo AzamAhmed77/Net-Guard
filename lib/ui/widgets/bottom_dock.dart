@@ -7,10 +7,10 @@ class BottomDockWidget extends StatelessWidget {
   final ValueChanged<int> onTabSelected;
 
   const BottomDockWidget({
-    Key? key,
+    super.key,
     required this.activeTab,
     required this.onTabSelected,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +33,7 @@ class BottomDockWidget extends StatelessWidget {
         border: Border.all(color: AppColors.borderDark, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
+            color: Colors.black.withValues(alpha: 0.4),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),

@@ -3,7 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class MethodChannelService {
-  static const MethodChannel _channel = MethodChannel('com.cybnux.netspeed/controller');
+  static const MethodChannel _channel =
+      MethodChannel('com.cybnux.netspeed/controller');
 
   static Future<bool> startVpn({
     int downloadLimit = 0,
@@ -62,6 +63,9 @@ class MethodChannelService {
     } on PlatformException catch (e) {
       debugPrint("VPN start failed: '${e.message}'.");
       return false;
+    } catch (e) {
+      debugPrint("VPN start failed: '$e'.");
+      return false;
     }
   }
 
@@ -71,6 +75,9 @@ class MethodChannelService {
       return success;
     } on PlatformException catch (e) {
       debugPrint("VPN stop failed: '${e.message}'.");
+      return false;
+    } catch (e) {
+      debugPrint("VPN stop failed: '$e'.");
       return false;
     }
   }
@@ -86,7 +93,8 @@ class MethodChannelService {
 
   static Future<Map<String, dynamic>> getRealTrafficStats() async {
     try {
-      final Map<dynamic, dynamic>? res = await _channel.invokeMethod('getStats');
+      final Map<dynamic, dynamic>? res =
+          await _channel.invokeMethod('getStats');
       if (res != null) {
         return Map<String, dynamic>.from(res);
       }
@@ -98,7 +106,8 @@ class MethodChannelService {
 
   static Future<Map<String, double>> getPerAppTraffic() async {
     try {
-      final Map<dynamic, dynamic>? res = await _channel.invokeMethod('getPerAppTraffic');
+      final Map<dynamic, dynamic>? res =
+          await _channel.invokeMethod('getPerAppTraffic');
       if (res != null) {
         return res.map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
       }
@@ -123,7 +132,8 @@ class MethodChannelService {
 
   static Future<List<dynamic>> getInstalledApps() async {
     try {
-      final List<dynamic>? res = await _channel.invokeMethod('getInstalledApps');
+      final List<dynamic>? res =
+          await _channel.invokeMethod('getInstalledApps');
       return res ?? [];
     } on PlatformException {
       return [];
@@ -270,21 +280,10 @@ class MethodChannelService {
     }
   }
 
-  static Future<bool> isMonitorServiceEnabled() async {
-    return isMonitorRunning();
-  }
-
-  static Future<void> setMonitorServiceEnabled(bool enabled) async {
-    if (enabled) {
-      await startMonitorService();
-    } else {
-      await stopMonitorService();
-    }
-  }
-
   static Future<Map<String, dynamic>> getMonitorLiveStats() async {
     try {
-      final Map<dynamic, dynamic>? res = await _channel.invokeMethod('getMonitorLiveStats');
+      final Map<dynamic, dynamic>? res =
+          await _channel.invokeMethod('getMonitorLiveStats');
       if (res != null) return Map<String, dynamic>.from(res);
     } catch (_) {}
     return {};

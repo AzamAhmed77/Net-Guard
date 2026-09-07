@@ -12,13 +12,15 @@ class VpnManager extends ChangeNotifier {
   final bool isDarkMode = true; // Permanent Dark Mode
   Timer? _statsTimer;
   Timer? _tempPassTimer;
+  bool _statsRequestInFlight = false;
 
   double _currentDownloadSpeed = 0.0;
   double _currentUploadSpeed = 0.0;
   double _totalDownloadMb = 0.0;
   double _totalUploadMb = 0.0;
-  int _activeConnections = 0;
+  final int _activeConnections = 0;
   bool _isLoadingApps = false;
+  bool _isVpnTransitioning = false;
 
   // Security & Firewall State
   bool autoQuarantineNewApps = false;
@@ -29,7 +31,9 @@ class VpnManager extends ChangeNotifier {
   int lastManualDownloadLimit = -1;
   int lastManualUploadLimit = -1;
   double _todayRealUsageMb = 0.0;
-  double get todayUsageMb => _todayRealUsageMb > 0.0 ? _todayRealUsageMb : _apps.fold(0.0, (sum, a) => sum + a.totalMb);
+  double get todayUsageMb => _todayRealUsageMb > 0.0
+      ? _todayRealUsageMb
+      : _apps.fold(0.0, (sum, a) => sum + a.totalMb);
 
   // History & Logs
   final List<double> _downloadHistory = List.generate(30, (_) => 0.0);
@@ -44,9 +48,11 @@ class VpnManager extends ChangeNotifier {
   double get totalUploadMb => _totalUploadMb;
   int get activeConnections => _activeConnections;
   bool get isLoadingApps => _isLoadingApps;
+  bool get isVpnTransitioning => _isVpnTransitioning;
   List<double> get downloadHistory => List.unmodifiable(_downloadHistory);
   List<double> get uploadHistory => List.unmodifiable(_uploadHistory);
-  List<Map<String, String>> get terminalLogs => List.unmodifiable(_terminalLogs);
+  List<Map<String, String>> get terminalLogs =>
+      List.unmodifiable(_terminalLogs);
   List<AppInfo> get apps => _apps;
 
   double get peakDownloadSpeed {
@@ -57,7 +63,9 @@ class VpnManager extends ChangeNotifier {
 
   double get avgDownloadSpeed {
     final nonZero = _downloadHistory.where((s) => s > 0).toList();
-    if (nonZero.isEmpty) return _currentDownloadSpeed > 0 ? _currentDownloadSpeed : 0.0;
+    if (nonZero.isEmpty) {
+      return _currentDownloadSpeed > 0 ? _currentDownloadSpeed : 0.0;
+    }
     return nonZero.reduce((a, b) => a + b) / nonZero.length;
   }
 
@@ -69,23 +77,27 @@ class VpnManager extends ChangeNotifier {
 
   int get blockedAppsCount {
     if (isBlockAllMode) {
-      return _apps.where((a) => !a.isWifiAllowed && !a.isMobileAllowed && !a.isTempAllowed).length;
+      return _apps
+          .where(
+              (a) => !a.isWifiAllowed && !a.isMobileAllowed && !a.isTempAllowed)
+          .length;
     }
     return _apps.where((a) => a.isEffectivelyBlocked).length;
   }
 
   int get allowedAppsCount {
     if (isBlockAllMode) {
-      return _apps.where((a) => (a.isWifiAllowed || a.isMobileAllowed) || a.isTempAllowed).length;
+      return _apps
+          .where(
+              (a) => (a.isWifiAllowed || a.isMobileAllowed) || a.isTempAllowed)
+          .length;
     }
     return _apps.where((a) => !a.isEffectivelyBlocked).length;
   }
 
-  int get tempPassAppsCount =>
-      _apps.where((a) => a.isTempAllowed).length;
+  int get tempPassAppsCount => _apps.where((a) => a.isTempAllowed).length;
 
-  int get trackerFlaggedCount =>
-      _apps.where((a) => a.hasTrackers).length;
+  int get trackerFlaggedCount => _apps.where((a) => a.hasTrackers).length;
 
   int get securityScore {
     int score = 45;
@@ -129,7 +141,11 @@ class VpnManager extends ChangeNotifier {
     final savedConfig = await StorageService.loadConfig();
     if (savedConfig != null) {
       config = savedConfig;
-      addLog("OK", isArabic ? "تم استرجاع الإعدادات المحفوظة بنجاح." : "Saved settings restored successfully.");
+      addLog(
+          "OK",
+          isArabic
+              ? "تم استرجاع الإعدادات المحفوظة بنجاح."
+              : "Saved settings restored successfully.");
     }
     _isMonitorRunning = await StorageService.loadMonitorEnabled();
     _isSpikeAlertEnabled = await StorageService.loadSpikeAlertEnabled();
@@ -146,7 +162,6 @@ class VpnManager extends ChangeNotifier {
     }
     await fetchInstalledApps();
     syncNativeSettings();
-
 
     try {
       final savedAccent = await StorageService.loadAccentColor();
@@ -175,9 +190,9 @@ class VpnManager extends ChangeNotifier {
   int get accentColorValue => _accentColorValue;
 
   Future<void> setAccentColor(Color color) async {
-    _accentColorValue = color.value;
+    _accentColorValue = color.toARGB32();
     AppColors.accent = color;
-    await StorageService.saveAccentColor(color.value);
+    await StorageService.saveAccentColor(color.toARGB32());
     notifyListeners();
   }
 
@@ -188,9 +203,11 @@ class VpnManager extends ChangeNotifier {
       case 'eco':
         config.downloadSpeedLimit = 256;
         config.uploadSpeedLimit = 128;
-        addLog("OK", isArabic
-            ? "🔋 تم تفعيل [وضع التوفير] — السرعة: 256K تنزيل / 128K رفع."
-            : "🔋 [Eco Mode] active: Speed set to 256K down / 128K up.");
+        addLog(
+            "OK",
+            isArabic
+                ? "🔋 تم تفعيل [وضع التوفير] — السرعة: 256K تنزيل / 128K رفع."
+                : "🔋 [Eco Mode] active: Speed set to 256K down / 128K up.");
         break;
       case 'unlimited':
         config.downloadSpeedLimit = -1;
@@ -202,9 +219,11 @@ class VpnManager extends ChangeNotifier {
           app.isWifiAllowed = true;
           app.isMobileAllowed = true;
         }
-        addLog("OK", isArabic
-            ? "🚀 تم تفعيل [الوضع المفتوح] — بدون أي قيود على السرعة."
-            : "🚀 [Unlimited Mode] active: No bandwidth limits.");
+        addLog(
+            "OK",
+            isArabic
+                ? "🚀 تم تفعيل [الوضع المفتوح] — بدون أي قيود على السرعة."
+                : "🚀 [Unlimited Mode] active: No bandwidth limits.");
         break;
       case 'default':
       default:
@@ -219,9 +238,11 @@ class VpnManager extends ChangeNotifier {
           app.isWifiAllowed = true;
           app.isMobileAllowed = true;
         }
-        addLog("OK", isArabic
-            ? "⚡ تم تفعيل [الوضع العادي] — تطبيق آخر سرعة قمت بضبطها يدوياً."
-            : "⚡ [Default Mode] active: Applied your manual speeds.");
+        addLog(
+            "OK",
+            isArabic
+                ? "⚡ تم تفعيل [الوضع العادي] — تطبيق آخر سرعة قمت بضبطها يدوياً."
+                : "⚡ [Default Mode] active: Applied your manual speeds.");
         break;
     }
     _persistState();
@@ -240,9 +261,11 @@ class VpnManager extends ChangeNotifier {
     _persistState();
     StorageService.saveAppSettings(_apps);
     syncNativeSettings();
-    addLog("OK", isArabic
-        ? "⚡ تم ضبط جميع التطبيقات على الوضع العادي (يتبع سرعة الرئيسية)."
-        : "⚡ All apps reset to Default mode (follows main speed).");
+    addLog(
+        "OK",
+        isArabic
+            ? "⚡ تم ضبط جميع التطبيقات على الوضع العادي (يتبع سرعة الرئيسية)."
+            : "⚡ All apps reset to Default mode (follows main speed).");
     notifyListeners();
   }
 
@@ -250,7 +273,8 @@ class VpnManager extends ChangeNotifier {
     config.downloadSpeedLimit = kbps;
     lastManualDownloadLimit = kbps;
     activePreset = 'default';
-    StorageService.saveManualLimits(lastManualDownloadLimit, lastManualUploadLimit);
+    StorageService.saveManualLimits(
+        lastManualDownloadLimit, lastManualUploadLimit);
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -260,7 +284,8 @@ class VpnManager extends ChangeNotifier {
     config.uploadSpeedLimit = kbps;
     lastManualUploadLimit = kbps;
     activePreset = 'default';
-    StorageService.saveManualLimits(lastManualDownloadLimit, lastManualUploadLimit);
+    StorageService.saveManualLimits(
+        lastManualDownloadLimit, lastManualUploadLimit);
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -272,14 +297,18 @@ class VpnManager extends ChangeNotifier {
     lastManualDownloadLimit = dlKbps;
     lastManualUploadLimit = ulKbps;
     activePreset = 'default';
-    StorageService.saveManualLimits(lastManualDownloadLimit, lastManualUploadLimit);
+    StorageService.saveManualLimits(
+        lastManualDownloadLimit, lastManualUploadLimit);
     _persistState();
     syncNativeSettings();
     notifyListeners();
   }
 
   int get customizedAppsCount {
-    return _apps.where((a) => !a.isWifiAllowed || !a.isMobileAllowed || a.speedMode != 'default').length;
+    return _apps
+        .where((a) =>
+            !a.isWifiAllowed || !a.isMobileAllowed || a.speedMode != 'default')
+        .length;
   }
 
   Future<int> saveCustomProfileSettings() async {
@@ -292,9 +321,11 @@ class VpnManager extends ChangeNotifier {
     activeSecurityProfile = 'custom';
     _persistState();
     syncNativeSettings();
-    addLog("OK", isArabic
-        ? "تم حفظ إعدادات وتكوين الوضع المخصص بنجاح ($count تطبيق معدل)."
-        : "Custom profile settings saved ($count customized apps).");
+    addLog(
+        "OK",
+        isArabic
+            ? "تم حفظ إعدادات وتكوين الوضع المخصص بنجاح ($count تطبيق معدل)."
+            : "Custom profile settings saved ($count customized apps).");
     notifyListeners();
     return count;
   }
@@ -306,17 +337,15 @@ class VpnManager extends ChangeNotifier {
       config.globalMode = 'whitelist';
       _persistState();
       syncNativeSettings();
-      addLog("OK", isArabic
-          ? "تم استعادة وتطبيق إعدادات الوضع المخصص بنجاح ($count تطبيق)."
-          : "Custom profile restored and applied ($count apps).");
+      addLog(
+          "OK",
+          isArabic
+              ? "تم استعادة وتطبيق إعدادات الوضع المخصص بنجاح ($count تطبيق)."
+              : "Custom profile restored and applied ($count apps).");
       notifyListeners();
       return count;
     }
     return -1;
-  }
-
-  Future<void> saveCurrentCustomPreset() async {
-    await saveCustomProfileSettings();
   }
 
   void setDnsProvider(String provider) {
@@ -330,9 +359,11 @@ class VpnManager extends ChangeNotifier {
     }
     _persistState();
     syncNativeSettings();
-    addLog("INFO", isArabic
-        ? "تم اختيار مزود DNS: $provider"
-        : "Selected DNS Provider: $provider");
+    addLog(
+        "INFO",
+        isArabic
+            ? "تم اختيار مزود DNS: $provider"
+            : "Selected DNS Provider: $provider");
     notifyListeners();
   }
 
@@ -351,15 +382,39 @@ class VpnManager extends ChangeNotifier {
 
   Future<void> toggleMonitorService() async {
     if (_isMonitorRunning) {
-      await MethodChannelService.stopMonitorService();
-      _isMonitorRunning = false;
-      await StorageService.saveMonitorEnabled(false);
-      addLog("INFO", isArabic ? "تم إيقاف مراقب السرعة في الخلفية." : "Background speed monitor stopped.");
+      final stopped = await MethodChannelService.stopMonitorService();
+      if (stopped) {
+        _isMonitorRunning = false;
+        await StorageService.saveMonitorEnabled(false);
+        addLog(
+            "INFO",
+            isArabic
+                ? "تم إيقاف مراقب السرعة في الخلفية."
+                : "Background speed monitor stopped.");
+      } else {
+        addLog(
+            "WARN",
+            isArabic
+                ? "تعذر إيقاف مراقب السرعة."
+                : "Could not stop the background speed monitor.");
+      }
     } else {
-      await MethodChannelService.startMonitorService();
-      _isMonitorRunning = true;
-      await StorageService.saveMonitorEnabled(true);
-      addLog("INFO", isArabic ? "تم تشغيل مراقب السرعة في الخلفية بنجاح." : "Background speed monitor started successfully.");
+      final started = await MethodChannelService.startMonitorService();
+      if (started) {
+        _isMonitorRunning = true;
+        await StorageService.saveMonitorEnabled(true);
+        addLog(
+            "INFO",
+            isArabic
+                ? "تم تشغيل مراقب السرعة في الخلفية بنجاح."
+                : "Background speed monitor started successfully.");
+      } else {
+        addLog(
+            "WARN",
+            isArabic
+                ? "تعذر تشغيل مراقب السرعة."
+                : "Could not start the background speed monitor.");
+      }
     }
     notifyListeners();
   }
@@ -368,9 +423,15 @@ class VpnManager extends ChangeNotifier {
     _isSpikeAlertEnabled = !_isSpikeAlertEnabled;
     await MethodChannelService.setSpikeAlertEnabled(_isSpikeAlertEnabled);
     await StorageService.saveSpikeAlertEnabled(_isSpikeAlertEnabled);
-    addLog("INFO", _isSpikeAlertEnabled
-        ? (isArabic ? "تم تفعيل كاشف النزيف السري للبيانات." : "Data spike detector enabled.")
-        : (isArabic ? "تم تعطيل كاشف النزيف السري للبيانات." : "Data spike detector disabled."));
+    addLog(
+        "INFO",
+        _isSpikeAlertEnabled
+            ? (isArabic
+                ? "تم تفعيل كاشف النزيف السري للبيانات."
+                : "Data spike detector enabled.")
+            : (isArabic
+                ? "تم تعطيل كاشف النزيف السري للبيانات."
+                : "Data spike detector disabled."));
     notifyListeners();
   }
 
@@ -389,18 +450,22 @@ class VpnManager extends ChangeNotifier {
         app.isMobileAllowed = false;
         app.tempAllowUntil = null;
       }
-      addLog("WARN", isArabic
-          ? "🛡️ تم تفعيل [وضع الحظر الشامل]: تم حظر جميع التطبيقات. الاستثناء يدوي لكل تطبيق."
-          : "🛡️ [Master Block All] active: All apps blocked except whitelisted.");
+      addLog(
+          "WARN",
+          isArabic
+              ? "🛡️ تم تفعيل [وضع الحظر الشامل]: تم حظر جميع التطبيقات. الاستثناء يدوي لكل تطبيق."
+              : "🛡️ [Master Block All] active: All apps blocked except whitelisted.");
     } else {
       activeSecurityProfile = 'allow_all';
       for (var app in _apps) {
         app.isWifiAllowed = true;
         app.isMobileAllowed = true;
       }
-      addLog("INFO", isArabic
-          ? "🛡️ تم إيقاف [وضع الحظر الشامل] وفتح الاتصال لجميع التطبيقات."
-          : "🛡️ [Master Block All] disabled: Internet access restored for all apps.");
+      addLog(
+          "INFO",
+          isArabic
+              ? "🛡️ تم إيقاف [وضع الحظر الشامل] وفتح الاتصال لجميع التطبيقات."
+              : "🛡️ [Master Block All] disabled: Internet access restored for all apps.");
     }
     _persistState();
     syncNativeSettings();
@@ -415,7 +480,11 @@ class VpnManager extends ChangeNotifier {
       config.blockedDomains.add(clean);
       _persistState();
       syncNativeSettings();
-      addLog("WARN", isArabic ? "تمت إضافة $clean إلى قائمة الحظر." : "Added $clean to custom blocklist.");
+      addLog(
+          "WARN",
+          isArabic
+              ? "تمت إضافة $clean إلى قائمة الحظر."
+              : "Added $clean to custom blocklist.");
       notifyListeners();
     }
   }
@@ -424,7 +493,11 @@ class VpnManager extends ChangeNotifier {
     if (config.blockedDomains.remove(domain)) {
       _persistState();
       syncNativeSettings();
-      addLog("INFO", isArabic ? "تمت إزالة $domain من قائمة الحظر." : "Removed $domain from custom blocklist.");
+      addLog(
+          "INFO",
+          isArabic
+              ? "تمت إزالة $domain من قائمة الحظر."
+              : "Removed $domain from custom blocklist.");
       notifyListeners();
     }
   }
@@ -433,9 +506,11 @@ class VpnManager extends ChangeNotifier {
     autoQuarantineNewApps = val;
     StorageService.saveAutoQuarantine(val);
     MethodChannelService.setAutoQuarantine(val);
-    addLog(val ? "OK" : "WARN", isArabic
-        ? "عزل التطبيقات الجديدة: ${val ? 'مفعّل' : 'معطّل'}"
-        : "Quarantine new apps: ${val ? 'Enabled' : 'Disabled'}");
+    addLog(
+        val ? "OK" : "WARN",
+        isArabic
+            ? "عزل التطبيقات الجديدة: ${val ? 'مفعّل' : 'معطّل'}"
+            : "Quarantine new apps: ${val ? 'Enabled' : 'Disabled'}");
     _persistState();
     notifyListeners();
   }
@@ -443,9 +518,11 @@ class VpnManager extends ChangeNotifier {
   void toggleLockdownOnScreenOff(bool val) {
     lockdownOnScreenOff = val;
     StorageService.saveLockdownScreenOff(val);
-    addLog(val ? "OK" : "WARN", isArabic
-        ? "الحظر عند قفل الشاشة: ${val ? 'مفعّل' : 'معطّل'}"
-        : "Block on screen off: ${val ? 'Enabled' : 'Disabled'}");
+    addLog(
+        val ? "OK" : "WARN",
+        isArabic
+            ? "الحظر عند قفل الشاشة: ${val ? 'مفعّل' : 'معطّل'}"
+            : "Block on screen off: ${val ? 'Enabled' : 'Disabled'}");
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -480,9 +557,11 @@ class VpnManager extends ChangeNotifier {
     }
     _persistState();
     syncNativeSettings();
-    addLog("INFO", isArabic
-        ? "تم ${allow ? 'فتح' : 'حظر'} الإنترنت عن $count تطبيق محدد."
-        : "Internet ${allow ? 'allowed' : 'blocked'} for $count selected apps.");
+    addLog(
+        "INFO",
+        isArabic
+            ? "تم ${allow ? 'فتح' : 'حظر'} الإنترنت عن $count تطبيق محدد."
+            : "Internet ${allow ? 'allowed' : 'blocked'} for $count selected apps.");
     notifyListeners();
   }
 
@@ -499,9 +578,11 @@ class VpnManager extends ChangeNotifier {
     }
     _persistState();
     syncNativeSettings();
-    addLog("INFO", isArabic
-        ? "تم تحديث وضع سرعة $count تطبيق إلى $mode"
-        : "Updated speed mode for $count apps to $mode");
+    addLog(
+        "INFO",
+        isArabic
+            ? "تم تحديث وضع سرعة $count تطبيق إلى $mode"
+            : "Updated speed mode for $count apps to $mode");
     notifyListeners();
   }
 
@@ -519,9 +600,11 @@ class VpnManager extends ChangeNotifier {
             : (isArabic
                 ? 'مخصص \u202A(${customSpeedKbps == 0 ? '0 KB/s كتم' : '\u200E$customSpeedKbps KB/s'})\u202C'
                 : 'Custom (${customSpeedKbps == 0 ? '0 KB/s Muted' : '$customSpeedKbps KB/s'})');
-    addLog("INFO", isArabic
-        ? "سرعة ${app.name} → $modeTitle"
-        : "${app.name} speed → $modeTitle");
+    addLog(
+        "INFO",
+        isArabic
+            ? "سرعة ${app.name} → $modeTitle"
+            : "${app.name} speed → $modeTitle");
     notifyListeners();
   }
 
@@ -529,9 +612,11 @@ class VpnManager extends ChangeNotifier {
     app.tempAllowUntil = DateTime.now().add(duration);
     app.isWifiAllowed = true;
     app.isMobileAllowed = true;
-    addLog("OK", isArabic
-        ? "تصريح مؤقت لـ ${app.name} لمدة ${duration.inMinutes} دقيقة."
-        : "Temporary pass for ${app.name} (${duration.inMinutes} mins).");
+    addLog(
+        "OK",
+        isArabic
+            ? "تصريح مؤقت لـ ${app.name} لمدة ${duration.inMinutes} دقيقة."
+            : "Temporary pass for ${app.name} (${duration.inMinutes} mins).");
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -541,9 +626,11 @@ class VpnManager extends ChangeNotifier {
     app.tempAllowUntil = null;
     app.isWifiAllowed = false;
     app.isMobileAllowed = false;
-    addLog("WARN", isArabic
-        ? "تم إلغاء التصريح المؤقت لـ ${app.name} وإعادته للحظر."
-        : "Temporary pass revoked for ${app.name}; app blocked.");
+    addLog(
+        "WARN",
+        isArabic
+            ? "تم إلغاء التصريح المؤقت لـ ${app.name} وإعادته للحظر."
+            : "Temporary pass revoked for ${app.name}; app blocked.");
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -566,15 +653,13 @@ class VpnManager extends ChangeNotifier {
   Future<void> applySecurityProfile(String profile) async {
     activeSecurityProfile = profile;
     switch (profile) {
-
       case 'ultra_saver':
         setPreset('eco');
         break;
 
       case 'focus':
         for (var app in _apps) {
-          final isSocial =
-              app.packageName.contains('youtube') ||
+          final isSocial = app.packageName.contains('youtube') ||
               app.packageName.contains('tiktok') ||
               app.packageName.contains('instagram') ||
               app.packageName.contains('facebook') ||
@@ -591,15 +676,18 @@ class VpnManager extends ChangeNotifier {
             app.speedMode = 'default';
           }
         }
-        addLog("INFO", isArabic
-            ? "🎯 تم تفعيل [وضع التركيز] — حظر شبكات التواصل الاجتماعي."
-            : "🎯 [Focus Mode] active: Social media apps blocked.");
+        addLog(
+            "INFO",
+            isArabic
+                ? "🎯 تم تفعيل [وضع التركيز] — حظر شبكات التواصل الاجتماعي."
+                : "🎯 [Focus Mode] active: Social media apps blocked.");
         break;
 
       case 'custom':
       default:
         // استرجاع الإعدادات والتخصيصات اليدوية التي حددها المستخدم سابقاً بدقة 100%
-        final restored = await StorageService.restoreCustomProfileSettings(_apps);
+        final restored =
+            await StorageService.restoreCustomProfileSettings(_apps);
         if (restored >= 0) {
           final limits = await StorageService.loadManualLimits();
           if (limits['dl'] != null && limits['dl']! >= 0) {
@@ -609,9 +697,11 @@ class VpnManager extends ChangeNotifier {
             config.uploadSpeedLimit = limits['ul']!;
           }
         }
-        addLog("OK", isArabic
-            ? "✨ تم استرجاع جميع إعداداتك وتخصيصاتك اليدوية للوضع المخصص بالكامل."
-            : "✨ Custom profile manual settings restored completely.");
+        addLog(
+            "OK",
+            isArabic
+                ? "✨ تم استرجاع جميع إعداداتك وتخصيصاتك اليدوية للوضع المخصص بالكامل."
+                : "✨ Custom profile manual settings restored completely.");
         break;
     }
     _persistState();
@@ -628,15 +718,19 @@ class VpnManager extends ChangeNotifier {
       );
       _persistState();
       syncNativeSettings();
-      addLog("OK", isArabic
-          ? "💾 تم حفظ الإعدادات والتخصيصات اليدوية بنجاح."
-          : "💾 Manual custom profile settings saved successfully.");
+      addLog(
+          "OK",
+          isArabic
+              ? "💾 تم حفظ الإعدادات والتخصيصات اليدوية بنجاح."
+              : "💾 Manual custom profile settings saved successfully.");
       notifyListeners();
       return true;
     } catch (e) {
-      addLog("ERR", isArabic
-          ? "فشل حفظ الإعدادات: ${e.toString()}"
-          : "Failed to save settings: ${e.toString()}");
+      addLog(
+          "ERR",
+          isArabic
+              ? "فشل حفظ الإعدادات: ${e.toString()}"
+              : "Failed to save settings: ${e.toString()}");
       return false;
     }
   }
@@ -646,7 +740,8 @@ class VpnManager extends ChangeNotifier {
     _isLoadingApps = true;
     notifyListeners();
     try {
-      final List<dynamic> appsJson = await MethodChannelService.getInstalledApps();
+      final List<dynamic> appsJson =
+          await MethodChannelService.getInstalledApps();
       _apps.clear();
       for (var item in appsJson) {
         _apps.add(AppInfo.fromJson(Map<String, dynamic>.from(item)));
@@ -661,15 +756,20 @@ class VpnManager extends ChangeNotifier {
           }
         }
       } catch (_) {}
-      await StorageService.applySavedAppSettings(_apps, autoQuarantine: autoQuarantineNewApps);
-      addLog("OK", isArabic
-          ? "تم فحص وتطبيق إعدادات ${_apps.length} تطبيق."
-          : "Scanned and applied settings for ${_apps.length} apps.");
+      await StorageService.applySavedAppSettings(_apps,
+          autoQuarantine: autoQuarantineNewApps);
+      addLog(
+          "OK",
+          isArabic
+              ? "تم فحص وتطبيق إعدادات ${_apps.length} تطبيق."
+              : "Scanned and applied settings for ${_apps.length} apps.");
     } catch (e) {
       _apps.clear();
-      addLog("WARN", isArabic
-          ? "تعذر قراءة قائمة التطبيقات من النظام: ${e.toString()}"
-          : "Could not read app list from system: ${e.toString()}");
+      addLog(
+          "WARN",
+          isArabic
+              ? "تعذر قراءة قائمة التطبيقات من النظام: ${e.toString()}"
+              : "Could not read app list from system: ${e.toString()}");
     } finally {
       _isLoadingApps = false;
       notifyListeners();
@@ -677,87 +777,108 @@ class VpnManager extends ChangeNotifier {
   }
 
   Future<void> toggleVpn() async {
+    if (_isVpnTransitioning) return;
+
+    _isVpnTransitioning = true;
     config.isVpnActive = !config.isVpnActive;
     _persistState();
     notifyListeners();
-    if (config.isVpnActive) {
-      final List<String> blockedWifiApps = [];
-      final List<String> blockedDataApps = [];
-      final List<String> allowedFirewallApps = [];
-      final Map<String, dynamic> modesMap = {};
-      final Map<String, dynamic> limitsMap = {};
+    try {
+      if (config.isVpnActive) {
+        final List<String> blockedWifiApps = [];
+        final List<String> blockedDataApps = [];
+        final List<String> allowedFirewallApps = [];
+        final Map<String, dynamic> modesMap = {};
+        final Map<String, dynamic> limitsMap = {};
 
-      for (var app in _apps) {
-        if (!app.isWifiAllowed && !app.isTempAllowed) {
-          blockedWifiApps.add(app.packageName);
-        }
-        if (!app.isMobileAllowed && !app.isTempAllowed) {
-          blockedDataApps.add(app.packageName);
-        }
+        for (var app in _apps) {
+          if (!app.isWifiAllowed && !app.isTempAllowed) {
+            blockedWifiApps.add(app.packageName);
+          }
+          if (!app.isMobileAllowed && !app.isTempAllowed) {
+            blockedDataApps.add(app.packageName);
+          }
 
-        if (isBlockAllMode) {
-          if ((app.isWifiAllowed || app.isMobileAllowed) || app.isTempAllowed) {
+          if (isBlockAllMode &&
+              ((app.isWifiAllowed || app.isMobileAllowed) ||
+                  app.isTempAllowed)) {
             allowedFirewallApps.add(app.packageName);
+          }
+
+          modesMap[app.packageName] = app.speedMode;
+          if (app.speedMode == 'custom') {
+            limitsMap[app.packageName] = app.customSpeedLimitKbps;
           }
         }
 
-        modesMap[app.packageName] = app.speedMode;
-        if (app.speedMode == 'custom') {
-          limitsMap[app.packageName] = app.customSpeedLimitKbps;
+        final String appSpeedConfigsJson = json.encode({
+          'modes': modesMap,
+          'limits': limitsMap,
+          'isGamingMode': false,
+        });
+
+        final dlBytes = config.downloadSpeedLimit == -1
+            ? -1
+            : config.downloadSpeedLimit * 1024;
+        final ulBytes =
+            config.uploadSpeedLimit == -1 ? -1 : config.uploadSpeedLimit * 1024;
+
+        final started = await MethodChannelService.startVpn(
+          downloadLimit: dlBytes,
+          uploadLimit: ulBytes,
+          blockedWifiApps: blockedWifiApps,
+          blockedDataApps: blockedDataApps,
+          blockAllFirewall: isBlockAllMode,
+          allowedFirewallApps: allowedFirewallApps,
+          dnsAdBlock: config.blockAds,
+          dnsAdultBlock: config.blockAdult,
+          dnsSocialBlock: config.blockSocial,
+          dnsCustomBlocked: config.blockedDomains,
+          dnsServers: _resolveActiveDnsServers(),
+          dataCapBytes: config.dataCapMb * 1024 * 1024,
+          dataCapAction: config.capAction,
+          schedEnabled: config.scheduleEnabled,
+          schedStartH: config.activeScheduleStartHour,
+          schedStartM: config.schedStartM,
+          schedEndH: config.activeScheduleEndHour,
+          schedEndM: config.schedEndM,
+          appSpeedConfigs: appSpeedConfigsJson,
+          lockdownScreenOff: lockdownOnScreenOff,
+          ebpfEnabled: config.ebpfEnabled,
+          dpiEnabled: config.dpiEnabled,
+          dnsRebindingProtection: config.dnsRebindingProtection,
+        );
+
+        if (started) {
+          addLog(
+              "OK",
+              isArabic
+                  ? "تم تشغيل محرك VPN وتطبيق السرعات المحددة."
+                  : "VPN engine active; configured speed limits applied.");
+        } else {
+          config.isVpnActive = false;
+          addLog(
+              "WARN",
+              isArabic
+                  ? "يتطلب VPN موافقة الإذن من أندرويد."
+                  : "VPN requires user permission from Android.");
+        }
+      } else {
+        final stopped = await MethodChannelService.stopVpn();
+        if (stopped) {
+          addLog(
+              "WARN",
+              isArabic
+                  ? "تم إيقاف خدمة VPN واسترجاع السرعة الافتراضية."
+                  : "VPN service stopped; default speeds restored.");
+        } else {
+          config.isVpnActive = true;
         }
       }
-
-      final String appSpeedConfigsJson = json.encode({
-        'modes': modesMap,
-        'limits': limitsMap,
-        'isGamingMode': false,
-      });
-
-      final dlBytes = config.downloadSpeedLimit == -1 ? -1 : config.downloadSpeedLimit * 1024;
-      final ulBytes = config.uploadSpeedLimit == -1 ? -1 : config.uploadSpeedLimit * 1024;
-
-      final started = await MethodChannelService.startVpn(
-        downloadLimit: dlBytes,
-        uploadLimit: ulBytes,
-        blockedWifiApps: blockedWifiApps,
-        blockedDataApps: blockedDataApps,
-        blockAllFirewall: isBlockAllMode,
-        allowedFirewallApps: allowedFirewallApps,
-        dnsAdBlock: config.blockAds,
-        dnsAdultBlock: config.blockAdult,
-        dnsSocialBlock: config.blockSocial,
-        dnsCustomBlocked: config.blockedDomains,
-        dnsServers: _resolveActiveDnsServers(),
-        dataCapBytes: config.dataCapMb * 1024 * 1024,
-        dataCapAction: config.capAction,
-        schedEnabled: config.scheduleEnabled,
-        schedStartH: config.activeScheduleStartHour,
-        schedStartM: config.schedStartM,
-        schedEndH: config.activeScheduleEndHour,
-        schedEndM: config.schedEndM,
-        appSpeedConfigs: appSpeedConfigsJson,
-        lockdownScreenOff: lockdownOnScreenOff,
-        ebpfEnabled: config.ebpfEnabled,
-        dpiEnabled: config.dpiEnabled,
-        dnsRebindingProtection: config.dnsRebindingProtection,
-      );
-
-      if (started) {
-        addLog("OK", isArabic
-            ? "تم تشغيل محرك VPN وتطبيق السرعات المحددة."
-            : "VPN engine active; configured speed limits applied.");
-      } else {
-        addLog("WARN", isArabic
-            ? "يتطلب VPN موافقة الإذن من أندرويد."
-            : "VPN requires user permission from Android.");
-        config.isVpnActive = false;
-        notifyListeners();
-      }
-    } else {
-      await MethodChannelService.stopVpn();
-      addLog("WARN", isArabic
-          ? "تم إيقاف خدمة VPN واسترجاع السرعة الافتراضية."
-          : "VPN service stopped; default speeds restored.");
+    } finally {
+      _isVpnTransitioning = false;
+      _persistState();
+      notifyListeners();
     }
   }
 
@@ -785,36 +906,6 @@ class VpnManager extends ChangeNotifier {
     config.proxyEnabled = imported.proxyEnabled;
     config.upstreamProxyHost = imported.upstreamProxyHost;
     config.upstreamProxyPort = imported.upstreamProxyPort;
-    _persistState();
-    syncNativeSettings();
-    notifyListeners();
-  }
-
-  void setPresetMode(String mode) {
-    config.presetMode = mode;
-    switch (mode) {
-      case 'zero':
-        config.downloadSpeedLimit = 0;
-        config.uploadSpeedLimit = 0;
-        break;
-      case 'eco':
-        config.downloadSpeedLimit = 256;
-        config.uploadSpeedLimit = 128;
-        break;
-      case 'balanced':
-        config.downloadSpeedLimit = 1024;
-        config.uploadSpeedLimit = 512;
-        break;
-      case 'performance':
-        config.downloadSpeedLimit = 4096;
-        config.uploadSpeedLimit = 2048;
-        break;
-      case 'unrestricted':
-      default:
-        config.downloadSpeedLimit = -1;
-        config.uploadSpeedLimit = -1;
-        break;
-    }
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -854,8 +945,10 @@ class VpnManager extends ChangeNotifier {
       'isGamingMode': false,
     });
 
-    final dlBytes = config.downloadSpeedLimit == -1 ? -1 : config.downloadSpeedLimit * 1024;
-    final ulBytes = config.uploadSpeedLimit == -1 ? -1 : config.uploadSpeedLimit * 1024;
+    final dlBytes =
+        config.downloadSpeedLimit == -1 ? -1 : config.downloadSpeedLimit * 1024;
+    final ulBytes =
+        config.uploadSpeedLimit == -1 ? -1 : config.uploadSpeedLimit * 1024;
 
     MethodChannelService.updateSettings(
       downloadLimit: dlBytes,
@@ -886,7 +979,10 @@ class VpnManager extends ChangeNotifier {
 
   List<String> _resolveActiveDnsServers() {
     if (config.blockAdult && config.selectedDnsProvider == 'Cloudflare') {
-      return ['1.1.1.3', '1.0.0.3']; // Cloudflare Family (Malware + Adult Block)
+      return [
+        '1.1.1.3',
+        '1.0.0.3'
+      ]; // Cloudflare Family (Malware + Adult Block)
     }
     if (config.blockAdult && config.selectedDnsProvider == 'AdGuard') {
       return ['94.140.14.15', '94.140.15.16']; // AdGuard Family
@@ -904,29 +1000,17 @@ class VpnManager extends ChangeNotifier {
     }
   }
 
-  void setCustomSpeedLimits(int downloadKbps, int uploadKbps) {
-    config.presetMode = 'manual';
-    config.downloadSpeedLimit = downloadKbps;
-    config.uploadSpeedLimit = uploadKbps;
-    _persistState();
-    syncNativeSettings();
-    final dlStr = downloadKbps == -1
-        ? (isArabic ? 'غير محدود' : 'Unlimited')
-        : '\u200E$downloadKbps KB/s';
-    final ulStr = uploadKbps == -1
-        ? (isArabic ? 'غير محدود' : 'Unlimited')
-        : '\u200E$uploadKbps KB/s';
-    addLog("INFO", isArabic
-        ? "تم تطبيق سرعة مخصصة: تنزيل $dlStr | رفع $ulStr"
-        : "Custom speed limits applied: Down $dlStr | Up $ulStr");
-    notifyListeners();
-  }
-
   void addBlockedDomain(String domain) {
-    String cleanDomain = domain.trim().replaceAll(RegExp(r'https?://|www\.'), '');
-    if (cleanDomain.isNotEmpty && !config.blockedDomains.contains(cleanDomain)) {
+    String cleanDomain =
+        domain.trim().replaceAll(RegExp(r'https?://|www\.'), '');
+    if (cleanDomain.isNotEmpty &&
+        !config.blockedDomains.contains(cleanDomain)) {
       config.blockedDomains.add(cleanDomain);
-      addLog("BLOCK", isArabic ? "تم حظر النطاق: $cleanDomain" : "Blocked domain: $cleanDomain");
+      addLog(
+          "BLOCK",
+          isArabic
+              ? "تم حظر النطاق: $cleanDomain"
+              : "Blocked domain: $cleanDomain");
       _persistState();
       syncNativeSettings();
       notifyListeners();
@@ -935,7 +1019,11 @@ class VpnManager extends ChangeNotifier {
 
   void removeBlockedDomain(String domain) {
     config.blockedDomains.remove(domain);
-    addLog("INFO", isArabic ? "تم رفع الحظر عن النطاق: $domain" : "Unblocked domain: $domain");
+    addLog(
+        "INFO",
+        isArabic
+            ? "تم رفع الحظر عن النطاق: $domain"
+            : "Unblocked domain: $domain");
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -956,7 +1044,7 @@ class VpnManager extends ChangeNotifier {
   }
 
   void _startTempPassWatchdog() {
-    _tempPassTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _tempPassTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       bool needSync = false;
       final now = DateTime.now();
       for (var app in _apps) {
@@ -965,9 +1053,11 @@ class VpnManager extends ChangeNotifier {
           app.isWifiAllowed = false;
           app.isMobileAllowed = false;
           needSync = true;
-          addLog("WARN", isArabic
-              ? "⏳ انتهت صلاحية التصريح المؤقت لـ ${app.name} وتم حظره."
-              : "⏳ Temporary pass expired for ${app.name}; app blocked.");
+          addLog(
+              "WARN",
+              isArabic
+                  ? "⏳ انتهت صلاحية التصريح المؤقت لـ ${app.name} وتم حظره."
+                  : "⏳ Temporary pass expired for ${app.name}; app blocked.");
         }
       }
       if (needSync) {
@@ -983,15 +1073,20 @@ class VpnManager extends ChangeNotifier {
   double _lastNotifiedUp = -1.0;
 
   void _startRealTrafficTicker() {
-    _statsTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+    _statsTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (_statsRequestInFlight) return;
+      _statsRequestInFlight = true;
       try {
         if (config.isVpnActive) {
           final stats = await MethodChannelService.getRealTrafficStats();
           if (stats.isNotEmpty) {
-            final rawDownBps = (stats['downloadBps'] as num?)?.toDouble() ?? 0.0;
+            final rawDownBps =
+                (stats['downloadBps'] as num?)?.toDouble() ?? 0.0;
             final rawUpBps = (stats['uploadBps'] as num?)?.toDouble() ?? 0.0;
-            final rawTotalDown = (stats['totalDownloadBytes'] as num?)?.toDouble() ?? 0.0;
-            final rawTotalUp = (stats['totalUploadBytes'] as num?)?.toDouble() ?? 0.0;
+            final rawTotalDown =
+                (stats['totalDownloadBytes'] as num?)?.toDouble() ?? 0.0;
+            final rawTotalUp =
+                (stats['totalUploadBytes'] as num?)?.toDouble() ?? 0.0;
 
             _currentDownloadSpeed = rawDownBps / 1024.0;
             _currentUploadSpeed = rawUpBps / 1024.0;
@@ -1003,15 +1098,19 @@ class VpnManager extends ChangeNotifier {
         // قراءة استهلاك اليوم الحقيقي والسرعة اللحظية من مراقب الشبكة المستقل في الخلفية
         final monitorStats = await MethodChannelService.getMonitorLiveStats();
         if (monitorStats.isNotEmpty) {
-          final wifiBytes = (monitorStats['todayWifiBytes'] as num?)?.toDouble() ?? 0.0;
-          final mobileBytes = (monitorStats['todayMobileBytes'] as num?)?.toDouble() ?? 0.0;
+          final wifiBytes =
+              (monitorStats['todayWifiBytes'] as num?)?.toDouble() ?? 0.0;
+          final mobileBytes =
+              (monitorStats['todayMobileBytes'] as num?)?.toDouble() ?? 0.0;
           final totalBytes = wifiBytes + mobileBytes;
           if (totalBytes > 0) {
             _todayRealUsageMb = totalBytes / (1024.0 * 1024.0);
           }
           if (!config.isVpnActive) {
-            final rawDown = (monitorStats['downloadBps'] as num?)?.toDouble() ?? 0.0;
-            final rawUp = (monitorStats['uploadBps'] as num?)?.toDouble() ?? 0.0;
+            final rawDown =
+                (monitorStats['downloadBps'] as num?)?.toDouble() ?? 0.0;
+            final rawUp =
+                (monitorStats['uploadBps'] as num?)?.toDouble() ?? 0.0;
             _currentDownloadSpeed = rawDown / 1024.0;
             _currentUploadSpeed = rawUp / 1024.0;
           }
@@ -1036,15 +1135,21 @@ class VpnManager extends ChangeNotifier {
             }
           }
         }
-      } catch (_) {}
+      } catch (_) {
+      } finally {
+        _statsRequestInFlight = false;
+      }
 
       _downloadHistory.removeAt(0);
       _downloadHistory.add(_currentDownloadSpeed);
       _uploadHistory.removeAt(0);
       _uploadHistory.add(_currentUploadSpeed);
 
-      final speedChanged = (_lastNotifiedDown != _currentDownloadSpeed || _lastNotifiedUp != _currentUploadSpeed);
-      if (speedChanged || _currentDownloadSpeed > 0 || _currentUploadSpeed > 0) {
+      final speedChanged = (_lastNotifiedDown != _currentDownloadSpeed ||
+          _lastNotifiedUp != _currentUploadSpeed);
+      if (speedChanged ||
+          _currentDownloadSpeed > 0 ||
+          _currentUploadSpeed > 0) {
         _lastNotifiedDown = _currentDownloadSpeed;
         _lastNotifiedUp = _currentUploadSpeed;
         notifyListeners();

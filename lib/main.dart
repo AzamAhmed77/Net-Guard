@@ -11,7 +11,7 @@ void main() {
 }
 
 class NetGuardApp extends StatelessWidget {
-  const NetGuardApp({Key? key}) : super(key: key);
+  const NetGuardApp({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -63,10 +63,6 @@ class MainActivity: FlutterActivity() {
     override fun onResume() {
         super.onResume()
         instance = this
-        // Notify Flutter whenever the app returns to foreground to refresh VPN and notification state
-        runOnUiThread {
-            flutterChannel?.invokeMethod("onToggleVpnFromNotification", null)
-        }
     }
 
     fun toggleVpnFromNative() {

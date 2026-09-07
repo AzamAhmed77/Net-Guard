@@ -268,6 +268,29 @@ class VpnWorker(private val vpnService: VpnService) {
         Log.i(TAG, "Network blocking set to: $block")
     }
 
+    fun reapplyFirewallRules() {
+        closeBlockedConnections()
+    }
+
+    private fun closeBlockedConnections() {
+        for ((key, entry) in tcpTable) {
+            val pkg = entry.packageName
+            if (pkg != null && isAppBlockedByFirewall(pkg)) {
+                try { entry.ch.close() } catch (_: Exception) {}
+                try { entry.key?.cancel() } catch (_: Exception) {}
+                tcpTable.remove(key)
+            }
+        }
+        for ((key, entry) in udpTable) {
+            val pkg = entry.packageName
+            if (pkg != null && isAppBlockedByFirewall(pkg)) {
+                try { entry.ch.close() } catch (_: Exception) {}
+                try { entry.key?.cancel() } catch (_: Exception) {}
+                udpTable.remove(key)
+            }
+        }
+    }
+
     fun updateWorkerSettings(
         dlLimit: Long, ulLimit: Long, allowed: List<String>,
         blockedWifi: List<String>, blockedData: List<String>,

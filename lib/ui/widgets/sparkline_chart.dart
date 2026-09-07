@@ -7,11 +7,11 @@ class SparklineChartWidget extends StatelessWidget {
   final double height;
 
   const SparklineChartWidget({
-    Key? key,
+    super.key,
     required this.data,
     required this.color,
     this.height = 45,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +40,7 @@ class SparklineChartWidget extends StatelessWidget {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: color.withOpacity(0.18),
+                color: color.withValues(alpha: 0.18),
               ),
             ),
           ],

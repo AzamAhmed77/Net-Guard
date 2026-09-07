@@ -224,17 +224,14 @@ class MyVpnService : VpnService() {
                 Intent.ACTION_SCREEN_OFF -> {
                     if (lockdownScreenOffEnabled && isRunning) {
                         isScreenOffLocked = true
-                        Log.i(TAG, "Screen OFF & Lockdown enabled: cutting off network traffic to save battery")
-                        vpnWorker?.setRates(1L, 1L)
-                        socksServer?.setRates(1L, 1L)
+                        Log.i(TAG, "Screen OFF & lockdown enabled: reapplying per-app firewall rules")
+                        vpnWorker?.reapplyFirewallRules()
                     }
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     if (isScreenOffLocked) {
                         isScreenOffLocked = false
-                        Log.i(TAG, "Screen ON: restoring normal configured network access")
-                        vpnWorker?.setRates(currentConfiguredDownloadLimit, currentConfiguredUploadLimit)
-                        socksServer?.setRates(currentConfiguredDownloadLimit, currentConfiguredUploadLimit)
+                        Log.i(TAG, "Screen ON: preserving normal per-app firewall rules")
                     }
                 }
             }

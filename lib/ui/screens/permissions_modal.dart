@@ -73,7 +73,7 @@ class _PermissionsModalState extends State<PermissionsModal>
           border: Border.all(color: AppColors.borderDark, width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.6),
+              color: Colors.black.withValues(alpha: 0.6),
               blurRadius: 30,
               offset: const Offset(0, 10),
             ),
@@ -146,11 +146,11 @@ class _PermissionsModalState extends State<PermissionsModal>
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: allOptimal
-                    ? AppColors.green.withOpacity(0.1)
-                    : AppColors.amber.withOpacity(0.1),
+                    ? AppColors.green.withValues(alpha: 0.1)
+                    : AppColors.amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: (allOptimal ? AppColors.green : AppColors.amber).withOpacity(0.3),
+                  color: (allOptimal ? AppColors.green : AppColors.amber).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -238,9 +238,9 @@ class _PermissionsModalState extends State<PermissionsModal>
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.amber.withOpacity(0.08),
+                              color: Colors.amber.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,7 +368,7 @@ class _PermissionsModalState extends State<PermissionsModal>
         color: AppColors.surfaceCardDark,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isGranted ? AppColors.borderDark : color.withOpacity(0.35),
+          color: isGranted ? AppColors.borderDark : color.withValues(alpha: 0.35),
         ),
       ),
       child: Column(
@@ -381,7 +381,7 @@ class _PermissionsModalState extends State<PermissionsModal>
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: isGranted ? AppColors.surfaceHover : color.withOpacity(0.12),
+                  color: isGranted ? AppColors.surfaceHover : color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: isGranted ? AppColors.textSecondary : color, size: 18),
@@ -401,8 +401,8 @@ class _PermissionsModalState extends State<PermissionsModal>
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: isGranted
-                      ? AppColors.green.withOpacity(0.15)
-                      : AppColors.amber.withOpacity(0.15),
+                      ? AppColors.green.withValues(alpha: 0.15)
+                      : AppColors.amber.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(

@@ -85,7 +85,7 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     Row(
                       children: _accentColors.map((color) {
-                        final isSelected = vpn.accentColorValue == color.value;
+                        final isSelected = vpn.accentColorValue == color.toARGB32();
                         return Padding(
                           padding: const EdgeInsets.only(left: 8),
                           child: GestureDetector(
@@ -495,8 +495,8 @@ class SettingsScreen extends StatelessWidget {
             ),
             Switch(
               value: value,
-              activeColor: AppColors.accent,
-              activeTrackColor: AppColors.accent.withOpacity(0.3),
+              activeThumbColor: AppColors.accent,
+              activeTrackColor: AppColors.accent.withValues(alpha: 0.3),
               inactiveThumbColor: AppColors.textSecondary,
               inactiveTrackColor: AppColors.surfaceDark,
               onChanged: onChanged,

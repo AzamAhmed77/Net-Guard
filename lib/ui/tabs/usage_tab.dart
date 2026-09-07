@@ -7,7 +7,7 @@ import '../../core/localization/app_strings.dart';
 import '../../core/services/method_channel_service.dart';
 
 class UsageTab extends StatefulWidget {
-  const UsageTab({Key? key}) : super(key: key);
+  const UsageTab({super.key});
 
   @override
   State<UsageTab> createState() => _UsageTabState();
@@ -603,9 +603,9 @@ class _UsageTabState extends State<UsageTab> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.accent.withOpacity(0.15),
+                              color: AppColors.accent.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+                              border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                             ),
                             child: Text(
                               _formatMb(totalUsage),
@@ -732,7 +732,7 @@ class _UsageTabState extends State<UsageTab> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.pie_chart_outline_rounded, size: 48, color: AppColors.textSecondary.withOpacity(0.3)),
+                      Icon(Icons.pie_chart_outline_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.3)),
                       const SizedBox(height: 12),
                       Text(
                         strings.noAppsUsageFound,

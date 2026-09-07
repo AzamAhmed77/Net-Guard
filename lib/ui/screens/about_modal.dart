@@ -6,7 +6,7 @@ import '../../core/localization/app_strings.dart';
 import '../widgets/glass_card.dart';
 
 class AboutModal extends StatelessWidget {
-  const AboutModal({Key? key}) : super(key: key);
+  const AboutModal({super.key});
 
   @override
   Widget build(BuildContext context) {

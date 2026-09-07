@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/managers/vpn_manager.dart';
@@ -14,7 +16,7 @@ import 'settings_screen.dart';
 import 'permissions_modal.dart';
 
 class RootScreen extends StatefulWidget {
-  const RootScreen({Key? key}) : super(key: key);
+  const RootScreen({super.key});
 
   @override
   State<RootScreen> createState() => _RootScreenState();
@@ -22,6 +24,7 @@ class RootScreen extends StatefulWidget {
 
 class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   int _activeTab = 0;
+  Timer? _permissionCheckTimer;
 
   final List<Widget> _tabs = [
     const DashboardTab(),
@@ -35,11 +38,13 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _checkInitialPermissions();
+    _permissionCheckTimer =
+        Timer(const Duration(milliseconds: 1500), _checkInitialPermissions);
   }
 
   @override
   void dispose() {
+    _permissionCheckTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -48,7 +53,9 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
     final manager = Provider.of<VpnManager>(context, listen: false);
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
       manager.pauseTrafficTicker();
     } else if (state == AppLifecycleState.resumed) {
       manager.resumeTrafficTicker();
@@ -56,11 +63,11 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _checkInitialPermissions() async {
-    await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
     try {
       final status = await MethodChannelService.checkPermissionsStatus();
-      if (status['usageStats'] != true || status['batteryOptimization'] != true) {
+      if (status['usageStats'] != true ||
+          status['batteryOptimization'] != true) {
         if (mounted) {
           showDialog(
             context: context,
@@ -121,12 +128,12 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
               color: manager.config.isVpnActive
-                  ? AppColors.accent.withOpacity(0.15)
+                  ? AppColors.accent.withValues(alpha: 0.15)
                   : AppColors.surfaceHover,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: manager.config.isVpnActive
-                    ? AppColors.accent.withOpacity(0.3)
+                    ? AppColors.accent.withValues(alpha: 0.3)
                     : AppColors.borderDark,
               ),
             ),
@@ -138,7 +145,9 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
                   height: 7,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: manager.config.isVpnActive ? AppColors.accent : AppColors.textSecondary,
+                    color: manager.config.isVpnActive
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -149,7 +158,9 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: manager.config.isVpnActive ? AppColors.accent : AppColors.textSecondary,
+                    color: manager.config.isVpnActive
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
                   ),
                 ),
               ],

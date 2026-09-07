@@ -16,8 +16,8 @@ import android.net.NetworkCapabilities
 import android.net.TrafficStats
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import android.widget.RemoteViews
@@ -73,7 +73,8 @@ class NetworkMonitorService : Service() {
         }
     }
 
-    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var monitorThread: HandlerThread
+    private lateinit var handler: Handler
     private var isScreenOn = true
 
     // قياس السرعة اللحظية
@@ -117,8 +118,8 @@ class NetworkMonitorService : Service() {
                 Log.w(TAG, "Monitor tick error: ${e.message}")
             }
 
-            // جدولة التحديث القادم حسب حالة الشاشة (ثانيتان عند فتح الشاشة، 60 ثانية عند الإغلاق)
-            val delay = if (isScreenOn) 2000L else 60000L
+            // جدولة التحديث القادم حسب حالة الشاشة (5 ثوانٍ عند فتح الشاشة، 60 ثانية عند الإغلاق)
+            val delay = if (isScreenOn) 5000L else 60000L
             handler.postDelayed(this, delay)
         }
     }
@@ -127,6 +128,9 @@ class NetworkMonitorService : Service() {
         super.onCreate()
         instance = this
         isRunning = true
+
+        monitorThread = HandlerThread("NetGuardMonitor").also { it.start() }
+        handler = Handler(monitorThread.looper)
 
         createNotificationChannel()
 
@@ -515,6 +519,7 @@ class NetworkMonitorService : Service() {
             unregisterReceiver(screenReceiver)
         } catch (_: Exception) {}
         handler.removeCallbacksAndMessages(null)
+        monitorThread.quitSafely()
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)

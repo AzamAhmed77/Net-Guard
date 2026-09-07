@@ -5,7 +5,7 @@ import '../../core/themes/app_colors.dart';
 import '../../core/localization/app_strings.dart';
 
 class DnsTab extends StatelessWidget {
-  const DnsTab({Key? key}) : super(key: key);
+  const DnsTab({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +25,9 @@ class DnsTab extends StatelessWidget {
             color: AppColors.surfaceCardDark,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isVpnActive ? AppColors.accent.withOpacity(0.4) : AppColors.borderDark,
+              color: isVpnActive
+                  ? AppColors.accent.withValues(alpha: 0.4)
+                  : AppColors.borderDark,
             ),
           ),
           child: Column(
@@ -35,15 +37,16 @@ class DnsTab extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: isVpnActive
-                          ? AppColors.accent.withOpacity(0.15)
+                          ? AppColors.accent.withValues(alpha: 0.15)
                           : AppColors.surfaceHover,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isVpnActive
-                            ? AppColors.accent.withOpacity(0.3)
+                            ? AppColors.accent.withValues(alpha: 0.3)
                             : AppColors.borderDark,
                       ),
                     ),
@@ -55,7 +58,9 @@ class DnsTab extends StatelessWidget {
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: isVpnActive ? AppColors.accent : AppColors.textSecondary,
+                            color: isVpnActive
+                                ? AppColors.accent
+                                : AppColors.textSecondary,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -66,7 +71,9 @@ class DnsTab extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: isVpnActive ? AppColors.accent : AppColors.textSecondary,
+                            color: isVpnActive
+                                ? AppColors.accent
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -90,7 +97,9 @@ class DnsTab extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                isVpnActive ? strings.blockerActiveSub : strings.blockerInactiveSub,
+                isVpnActive
+                    ? strings.blockerActiveSub
+                    : strings.blockerInactiveSub,
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -101,12 +110,23 @@ class DnsTab extends StatelessWidget {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: () => vpn.toggleVpn(),
-                  icon: Icon(
-                    isVpnActive ? Icons.power_settings_new_rounded : Icons.flash_on_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  onPressed: vpn.isVpnTransitioning ? null : vpn.toggleVpn,
+                  icon: vpn.isVpnTransitioning
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          isVpnActive
+                              ? Icons.power_settings_new_rounded
+                              : Icons.flash_on_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                   label: Text(
                     isVpnActive ? strings.stopBlocker : strings.startBlocker,
                     style: const TextStyle(
@@ -116,12 +136,15 @@ class DnsTab extends StatelessWidget {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isVpnActive ? AppColors.surfaceHover : AppColors.accent,
+                    backgroundColor:
+                        isVpnActive ? AppColors.surfaceHover : AppColors.accent,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                       side: BorderSide(
-                        color: isVpnActive ? AppColors.borderDark : Colors.transparent,
+                        color: isVpnActive
+                            ? AppColors.borderDark
+                            : Colors.transparent,
                       ),
                     ),
                   ),
@@ -157,12 +180,14 @@ class DnsTab extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: !vpn.isBlockAllMode && vpn.activeSecurityProfile != 'custom'
+                          color: !vpn.isBlockAllMode &&
+                                  vpn.activeSecurityProfile != 'custom'
                               ? AppColors.accent
                               : AppColors.surfaceDark,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: !vpn.isBlockAllMode && vpn.activeSecurityProfile != 'custom'
+                            color: !vpn.isBlockAllMode &&
+                                    vpn.activeSecurityProfile != 'custom'
                                 ? AppColors.accent
                                 : AppColors.borderDark,
                           ),
@@ -173,7 +198,8 @@ class DnsTab extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
-                            color: !vpn.isBlockAllMode && vpn.activeSecurityProfile != 'custom'
+                            color: !vpn.isBlockAllMode &&
+                                    vpn.activeSecurityProfile != 'custom'
                                 ? Colors.white
                                 : AppColors.textSecondary,
                           ),
@@ -191,10 +217,14 @@ class DnsTab extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: vpn.isBlockAllMode ? AppColors.red : AppColors.surfaceDark,
+                          color: vpn.isBlockAllMode
+                              ? AppColors.red
+                              : AppColors.surfaceDark,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: vpn.isBlockAllMode ? AppColors.red : AppColors.borderDark,
+                            color: vpn.isBlockAllMode
+                                ? AppColors.red
+                                : AppColors.borderDark,
                           ),
                         ),
                         alignment: Alignment.center,
@@ -203,7 +233,9 @@ class DnsTab extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
-                            color: vpn.isBlockAllMode ? Colors.white : AppColors.textSecondary,
+                            color: vpn.isBlockAllMode
+                                ? Colors.white
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -219,12 +251,14 @@ class DnsTab extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: vpn.activeSecurityProfile == 'custom' && !vpn.isBlockAllMode
+                          color: vpn.activeSecurityProfile == 'custom' &&
+                                  !vpn.isBlockAllMode
                               ? const Color(0xFF8B5CF6)
                               : AppColors.surfaceDark,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: vpn.activeSecurityProfile == 'custom' && !vpn.isBlockAllMode
+                            color: vpn.activeSecurityProfile == 'custom' &&
+                                    !vpn.isBlockAllMode
                                 ? const Color(0xFF8B5CF6)
                                 : AppColors.borderDark,
                           ),
@@ -235,7 +269,8 @@ class DnsTab extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
-                            color: vpn.activeSecurityProfile == 'custom' && !vpn.isBlockAllMode
+                            color: vpn.activeSecurityProfile == 'custom' &&
+                                    !vpn.isBlockAllMode
                                 ? Colors.white
                                 : AppColors.textSecondary,
                           ),
@@ -357,7 +392,7 @@ class DnsTab extends StatelessWidget {
                   ),
                   Switch(
                     value: vpn.config.schedEnabled,
-                    activeColor: AppColors.accent,
+                    activeThumbColor: AppColors.accent,
                     onChanged: (val) {
                       vpn.config.schedEnabled = val;
                       vpn.syncNativeSettings();
@@ -438,7 +473,9 @@ class DnsTab extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Icon(icon, color: value ? AppColors.accent : AppColors.textSecondary, size: 20),
+          Icon(icon,
+              color: value ? AppColors.accent : AppColors.textSecondary,
+              size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -455,14 +492,15 @@ class DnsTab extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textSecondary),
                 ),
               ],
             ),
           ),
           Switch(
             value: value,
-            activeColor: AppColors.accent,
+            activeThumbColor: AppColors.accent,
             onChanged: onChanged,
           ),
         ],
@@ -477,7 +515,8 @@ class DnsTab extends StatelessWidget {
     required int minute,
     required Function(int h, int m) onTimePicked,
   }) {
-    final timeStr = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+    final timeStr =
+        '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
     return GestureDetector(
       onTap: () async {
         final time = await showTimePicker(
@@ -498,8 +537,14 @@ class DnsTab extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            Text(timeStr, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            Text(timeStr,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary)),
           ],
         ),
       ),

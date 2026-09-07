@@ -7,10 +7,10 @@ class PowerButton extends StatelessWidget {
   final VoidCallback onToggle;
 
   const PowerButton({
-    Key? key,
+    super.key,
     required this.isActive,
     required this.onToggle,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +39,7 @@ class PowerButton extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.green.withOpacity(0.25),
+                    color: AppColors.green.withValues(alpha: 0.25),
                     width: 1.5,
                   ),
                 ),
@@ -50,7 +50,7 @@ class PowerButton extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.green.withOpacity(0.12),
+                    color: AppColors.green.withValues(alpha: 0.12),
                     width: 1.0,
                   ),
                 ),
@@ -70,7 +70,7 @@ class PowerButton extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: activeColor.withOpacity(isActive ? 0.35 : 0.12),
+                    color: activeColor.withValues(alpha: isActive ? 0.35 : 0.12),
                     blurRadius: isActive ? 20 : 8,
                     spreadRadius: isActive ? 2 : 0,
                   ),
@@ -102,7 +102,7 @@ class PowerButton extends StatelessWidget {
                         ? (s.isAr ? 'نشط' : 'Active')
                         : (s.isAr ? 'اضغط للتشغيل' : 'Tap to Start'),
                     style: TextStyle(
-                      color: activeColor.withOpacity(0.8),
+                      color: activeColor.withValues(alpha: 0.8),
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
                     ),
