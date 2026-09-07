@@ -100,11 +100,11 @@ class LiveLogsModal extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.copy_rounded, size: 14, color: AppColors.accent),
+                          Icon(Icons.copy_rounded, size: 14, color: AppColors.accent),
                           const SizedBox(width: 4),
                           Text(
                             strings.exportLogs,
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accent),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accent),
                           ),
                         ],
                       ),
