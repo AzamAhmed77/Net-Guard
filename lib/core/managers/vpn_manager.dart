@@ -145,6 +145,7 @@ class VpnManager extends ChangeNotifier {
       config.uploadSpeedLimit = lastManualUploadLimit;
     }
     await fetchInstalledApps();
+    syncNativeSettings();
 
 
     try {

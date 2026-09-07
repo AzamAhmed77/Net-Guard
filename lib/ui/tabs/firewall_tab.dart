@@ -397,54 +397,62 @@ class _FirewallTabState extends State<FirewallTab> {
                 const SizedBox(width: 4),
               ],
 
-              // App Icon
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceHover,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: app.iconBytes != null
-                      ? Image.memory(
-                          app.iconBytes!,
-                          width: 38,
-                          height: 38,
-                          fit: BoxFit.cover,
-                        )
-                      : const Icon(Icons.android, color: AppColors.textSecondary, size: 22),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // App Name & Package
+              // App Icon & Name (Tappable to open speed & pass settings)
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      app.name,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _showAppSpeedDialog(context, vpn, app, strings),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceHover,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: app.iconBytes != null
+                              ? Image.memory(
+                                  app.iconBytes!,
+                                  width: 38,
+                                  height: 38,
+                                  fit: BoxFit.cover,
+                                )
+                              : const Icon(Icons.android, color: AppColors.textSecondary, size: 22),
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      app.packageName,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              app.name,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              app.packageName,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
@@ -583,6 +591,7 @@ class _FirewallTabState extends State<FirewallTab> {
     }
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => _showAppSpeedDialog(context, vpn, app, strings),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -692,6 +701,19 @@ class _FirewallTabState extends State<FirewallTab> {
                     onTap: () {
                       vpn.setAppSpeedMode(app, 'default');
                       Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            strings.isAr
+                                ? 'تم ضبط ${app.name} على الوضع العادي (يتبع السرعة الرئيسية)'
+                                : '${app.name} set to Default speed mode',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: AppColors.surfaceCardDark,
+                          duration: const Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
                     },
                   ),
                   const SizedBox(height: 8),
@@ -706,6 +728,19 @@ class _FirewallTabState extends State<FirewallTab> {
                     onTap: () {
                       vpn.setAppSpeedMode(app, 'unlimited');
                       Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            strings.isAr
+                                ? 'تم ضبط ${app.name} على سرعة مفتوحة غير مقيدة (∞)'
+                                : '${app.name} set to Unlimited speed mode',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: AppColors.surfaceCardDark,
+                          duration: const Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
                     },
                   ),
                   const SizedBox(height: 8),
@@ -807,6 +842,22 @@ class _FirewallTabState extends State<FirewallTab> {
                             onPressed: () {
                               vpn.setAppSpeedMode(app, 'custom', customSpeedKbps: customKbps);
                               Navigator.pop(ctx);
+                              final speedText = customKbps == 0
+                                  ? (strings.isAr ? 'كتم كامل 0 KB/s' : '0 KB/s (Muted)')
+                                  : '\u200E$customKbps KB/s';
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    strings.isAr
+                                        ? 'تم ضبط وحفظ سرعة ${app.name} على $speedText'
+                                        : '${app.name} custom speed set to $speedText',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  backgroundColor: const Color(0xFFF59E0B),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFF59E0B),
@@ -840,6 +891,19 @@ class _FirewallTabState extends State<FirewallTab> {
                           onPressed: () {
                             vpn.grantTemporaryPass(app, const Duration(minutes: 15));
                             Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  strings.isAr
+                                      ? 'تم منح تصريح مؤقت لـ ${app.name} لمدة 15 دقيقة'
+                                      : 'Granted 15 min temporary pass for ${app.name}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                backgroundColor: AppColors.surfaceCardDark,
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           },
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: AppColors.borderDark),
@@ -854,6 +918,19 @@ class _FirewallTabState extends State<FirewallTab> {
                           onPressed: () {
                             vpn.grantTemporaryPass(app, const Duration(minutes: 30));
                             Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  strings.isAr
+                                      ? 'تم منح تصريح مؤقت لـ ${app.name} لمدة 30 دقيقة'
+                                      : 'Granted 30 min temporary pass for ${app.name}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                backgroundColor: AppColors.surfaceCardDark,
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           },
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: AppColors.borderDark),
@@ -868,6 +945,19 @@ class _FirewallTabState extends State<FirewallTab> {
                           onPressed: () {
                             vpn.grantTemporaryPass(app, const Duration(hours: 1));
                             Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  strings.isAr
+                                      ? 'تم منح تصريح مؤقت لـ ${app.name} لمدة ساعة واحدة'
+                                      : 'Granted 1 hour temporary pass for ${app.name}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                backgroundColor: AppColors.surfaceCardDark,
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           },
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: AppColors.borderDark),

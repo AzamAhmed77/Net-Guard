@@ -135,6 +135,7 @@ class StorageService {
           'speedMode': app.speedMode,
           'customSpeed': app.customSpeedLimitKbps,
           'isQuarantined': app.isQuarantined,
+          'tempUntil': app.tempAllowUntil?.toIso8601String(),
         };
       }
       await prefs.setString(_keyAppSettings, json.encode(appData));
@@ -149,18 +150,36 @@ class StorageService {
       final jsonStr = prefs.getString(_keyAppSettings);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final Map<String, dynamic> appData = json.decode(jsonStr);
+        final now = DateTime.now();
         for (var app in apps) {
           if (appData.containsKey(app.packageName)) {
             final data = appData[app.packageName] as Map<String, dynamic>;
-            app.isWifiAllowed = data['wifi'] ?? true;
-            app.isMobileAllowed = data['mobile'] ?? true;
             app.speedMode = data['speedMode'] ?? 'default';
             app.customSpeedLimitKbps = data['customSpeed'] ?? 0;
             app.isQuarantined = data['isQuarantined'] ?? false;
+            
+            final tempUntilStr = data['tempUntil'];
+            if (tempUntilStr != null) {
+              final parsed = DateTime.tryParse(tempUntilStr);
+              if (parsed != null && parsed.isAfter(now)) {
+                app.tempAllowUntil = parsed;
+                app.isWifiAllowed = true;
+                app.isMobileAllowed = true;
+              } else {
+                app.tempAllowUntil = null;
+                app.isWifiAllowed = false;
+                app.isMobileAllowed = false;
+              }
+            } else {
+              app.tempAllowUntil = null;
+              app.isWifiAllowed = data['wifi'] ?? true;
+              app.isMobileAllowed = data['mobile'] ?? true;
+            }
           } else if (autoQuarantine) {
             app.isWifiAllowed = false;
             app.isMobileAllowed = false;
             app.isQuarantined = true;
+            app.tempAllowUntil = null;
           }
         }
       }

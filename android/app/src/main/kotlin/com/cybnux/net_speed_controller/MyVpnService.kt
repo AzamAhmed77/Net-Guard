@@ -306,8 +306,14 @@ class MyVpnService : VpnService() {
                         dataCapBytes, dataCapAction,
                         schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM
                     )
-                    if (appSpeedConfigs.isNotEmpty()) {
-                        vpnWorker?.updateAppSpeedConfigs(appSpeedConfigs)
+                    val effectiveAppSpeedConfigs = if (appSpeedConfigs.isNotEmpty()) {
+                        appSpeedConfigs
+                    } else {
+                        val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+                        prefs.getString("app_speed_configs", "") ?: ""
+                    }
+                    if (effectiveAppSpeedConfigs.isNotEmpty()) {
+                        vpnWorker?.updateAppSpeedConfigs(effectiveAppSpeedConfigs)
                     }
                     socksServer?.start(1080)
                     NetworkMonitorService.instance?.forceImmediateSpeedUpdate()
@@ -356,8 +362,14 @@ class MyVpnService : VpnService() {
                         dataCapBytes, dataCapAction,
                         schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM
                     )
-                    if (appSpeedConfigs.isNotEmpty()) {
-                        vpnWorker?.updateAppSpeedConfigs(appSpeedConfigs)
+                    val effectiveUpdateConfigs = if (appSpeedConfigs.isNotEmpty()) {
+                        appSpeedConfigs
+                    } else {
+                        val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+                        prefs.getString("app_speed_configs", "") ?: ""
+                    }
+                    if (effectiveUpdateConfigs.isNotEmpty()) {
+                        vpnWorker?.updateAppSpeedConfigs(effectiveUpdateConfigs)
                     }
                     socksServer?.setRates(downloadLimit, uploadLimit)
                     NetworkMonitorService.instance?.updateNotification()
@@ -465,6 +477,12 @@ class MyVpnService : VpnService() {
                 dataCapBytes, dataCapAction,
                 schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM
             )
+            val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+            val savedAppSpeedConfigs = prefs.getString("app_speed_configs", "") ?: ""
+            if (savedAppSpeedConfigs.isNotEmpty()) {
+                Log.i(TAG, "Restoring saved app speed configs upon start: $savedAppSpeedConfigs")
+                vpnWorker?.updateAppSpeedConfigs(savedAppSpeedConfigs)
+            }
             isRunning = true
             instance = this
             NetworkMonitorService.instance?.forceImmediateSpeedUpdate()

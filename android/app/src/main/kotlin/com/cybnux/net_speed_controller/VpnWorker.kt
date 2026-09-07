@@ -289,13 +289,14 @@ class VpnWorker(private val vpnService: VpnService) {
 
         Log.i(TAG, "Worker settings updated. Closing blocked connections only.")
         
-        // Dynamically close connections that are now blocked by the updated firewall
+        // Dynamically close connections that are now blocked by the updated firewall or muted (0 KB/s)
         val tcpKeys = tcpTable.keys.toList()
         for (key in tcpKeys) {
             val entry = tcpTable[key] ?: continue
             val pkg = entry.packageName
-            if (pkg != null && isAppBlockedByFirewall(pkg)) {
-                Log.i(TAG, "Closing newly blocked TCP connection: $pkg")
+            val isMuted = pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L
+            if (pkg != null && (isAppBlockedByFirewall(pkg) || isMuted)) {
+                Log.i(TAG, "Closing newly blocked/muted TCP connection: $pkg")
                 try { entry.ch.close() } catch (_: Exception) {}
                 try { entry.key?.cancel() } catch (_: Exception) {}
                 tcpTable.remove(key)
@@ -305,8 +306,9 @@ class VpnWorker(private val vpnService: VpnService) {
         for (key in udpKeys) {
             val entry = udpTable[key] ?: continue
             val pkg = entry.packageName
-            if (pkg != null && isAppBlockedByFirewall(pkg)) {
-                Log.i(TAG, "Closing newly blocked UDP channel: $pkg")
+            val isMuted = pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L
+            if (pkg != null && (isAppBlockedByFirewall(pkg) || isMuted)) {
+                Log.i(TAG, "Closing newly blocked/muted UDP channel: $pkg")
                 try { entry.ch.close() } catch (_: Exception) {}
                 try { entry.key?.cancel() } catch (_: Exception) {}
                 udpTable.remove(key)
@@ -352,6 +354,37 @@ class VpnWorker(private val vpnService: VpnService) {
             appDlLimiters.keys.retainAll(dlLimits.keys)
             appUlLimiters.keys.retainAll(dlLimits.keys)
             nextAppDlSendTimeMs.keys.retainAll(dlLimits.keys)
+
+            // Update existing limiters with new values immediately
+            for ((pkg, lim) in dlLimits) {
+                appDlLimiters[pkg]?.limitBps = lim
+                appUlLimiters[pkg]?.limitBps = lim
+            }
+
+            // Immediately disconnect/close any TCP and UDP connections for muted apps (0 KB/s)
+            val activeTcpKeys = tcpTable.keys.toList()
+            for (key in activeTcpKeys) {
+                val entry = tcpTable[key] ?: continue
+                val pkg = entry.packageName
+                if (pkg != null && modes[pkg] == "custom" && dlLimits[pkg] == 0L) {
+                    Log.i(TAG, "Closing newly muted TCP connection: $pkg")
+                    try { entry.ch.close() } catch (_: Exception) {}
+                    try { entry.key?.cancel() } catch (_: Exception) {}
+                    tcpTable.remove(key)
+                }
+            }
+            val activeUdpKeys = udpTable.keys.toList()
+            for (key in activeUdpKeys) {
+                val entry = udpTable[key] ?: continue
+                val pkg = entry.packageName
+                if (pkg != null && modes[pkg] == "custom" && dlLimits[pkg] == 0L) {
+                    Log.i(TAG, "Closing newly muted UDP channel: $pkg")
+                    try { entry.ch.close() } catch (_: Exception) {}
+                    try { entry.key?.cancel() } catch (_: Exception) {}
+                    udpTable.remove(key)
+                }
+            }
+
             Log.i(TAG, "App speed configs updated: ${modes.size} apps configured")
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing app speed configs: ${e.message}")
@@ -429,7 +462,7 @@ class VpnWorker(private val vpnService: VpnService) {
         return payLen <= 0
     }
 
-    private fun queueDownloadPacket(pkt: ByteArray) {
+    private fun queueDownloadPacket(pkt: ByteArray, pkgOverride: String? = null) {
         val now = System.currentTimeMillis()
 
         // Pure TCP control packets (ACK, SYN, FIN, RST with no payload) must NEVER be delayed or throttled!
@@ -442,7 +475,7 @@ class VpnWorker(private val vpnService: VpnService) {
             return
         }
 
-        val pkg = getDownloadPacketPackage(pkt)
+        val pkg = pkgOverride ?: getDownloadPacketPackage(pkt)
         val shouldThrottle = shouldThrottleApp(pkg)
         val sendTime: Long
 
@@ -618,11 +651,9 @@ class VpnWorker(private val vpnService: VpnService) {
                 val now = System.currentTimeMillis()
                 
                 refillTokens()
-                if (uploadBps > 0 && ulTokens > 0) {
-                    for (entry in tcpTable.values) {
-                        if (entry.writeQueue.isNotEmpty()) {
-                            writePendingTcp(entry)
-                        }
+                for (entry in tcpTable.values) {
+                    if (entry.writeQueue.isNotEmpty()) {
+                        writePendingTcp(entry)
                     }
                 }
 
@@ -718,8 +749,9 @@ class VpnWorker(private val vpnService: VpnService) {
             val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_UDP, sA, sP, dA, dP)
             val pkg = getPackageNameForUid(uid)
             
-            if (pkg != null && isAppBlockedByFirewall(pkg)) {
-                Log.i(TAG, "Firewall Blocked UDP packet from: $pkg")
+            val isMuted = pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L
+            if (pkg != null && (isAppBlockedByFirewall(pkg) || isMuted)) {
+                Log.i(TAG, "Firewall/Muted Blocked UDP packet from: $pkg")
                 return
             }
 
@@ -792,7 +824,7 @@ class VpnWorker(private val vpnService: VpnService) {
             rxBytesThisSecond += n
             checkDataCap(n)
 
-            queueDownloadPacket(buildUdp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort, data))
+            queueDownloadPacket(buildUdp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort, data), e.packageName)
         } catch (ex: Exception) { Log.w(TAG, "UDP recv err: ${ex.message}") }
     }
 
@@ -825,8 +857,9 @@ class VpnWorker(private val vpnService: VpnService) {
             val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_TCP, sA, sP, dA, dP)
             val pkg = getPackageNameForUid(uid)
 
-            if (pkg != null && isAppBlockedByFirewall(pkg)) {
-                Log.i(TAG, "Firewall Blocked TCP connection from: $pkg")
+            val isMuted = pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L
+            if (pkg != null && (isAppBlockedByFirewall(pkg) || isMuted)) {
+                Log.i(TAG, "Firewall/Muted Blocked TCP connection from: $pkg")
                 rstTo(dA, sA, dP, sP, ack, seq + 1)
                 return
             }
@@ -1019,7 +1052,7 @@ class VpnWorker(private val vpnService: VpnService) {
             checkDataCap(n)
 
             queueDownloadPacket(buildTcp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort,
-                e.mySeq, e.myAck, ACK or PSH, data))
+                e.mySeq, e.myAck, ACK or PSH, data), e.packageName)
             e.mySeq += n
         } catch (ex: Exception) {
             Log.w(TAG, "TCP recv err: ${ex.message}")
