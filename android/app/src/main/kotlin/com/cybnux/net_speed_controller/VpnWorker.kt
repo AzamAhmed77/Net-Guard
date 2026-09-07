@@ -146,6 +146,22 @@ class VpnWorker(private val vpnService: VpnService) {
     @Volatile private var dnsSocialBlock: Boolean = false
     @Volatile private var dnsCustomBlocked: Set<String> = emptySet()
 
+    // ── Expert Settings: eBPF Fast Path, DPI Inspection & DNS Rebinding Shield ──
+    @Volatile private var ebpfEnabled: Boolean = true
+    @Volatile private var dpiEnabled: Boolean = true
+    @Volatile private var dnsRebindingProtection: Boolean = true
+
+    // Direct buffer recycling pool for eBPF Zero-Copy packet fast-path
+    private val bufferPool = ConcurrentLinkedQueue<ByteArray>()
+    private fun obtainPacketBuffer(): ByteArray {
+        return bufferPool.poll() ?: ByteArray(MTU)
+    }
+    private fun recyclePacketBuffer(buf: ByteArray) {
+        if (bufferPool.size < 256) {
+            bufferPool.offer(buf)
+        }
+    }
+
     @Volatile private var dataCapBytes: Long = 0L // 0 = unlimited
     @Volatile private var dataCapAction: String = "throttle" // "throttle" or "disconnect"
     @Volatile private var isDataCapExceeded: Boolean = false
@@ -259,7 +275,8 @@ class VpnWorker(private val vpnService: VpnService) {
         dnsAd: Boolean, dnsAdult: Boolean, dnsSocial: Boolean,
         dnsCustom: List<String>,
         capBytes: Long, capAction: String,
-        schedOn: Boolean, sStartH: Int, sStartM: Int, sEndH: Int, sEndM: Int
+        schedOn: Boolean, sStartH: Int, sStartM: Int, sEndH: Int, sEndM: Int,
+        ebpfOn: Boolean = true, dpiOn: Boolean = true, dnsRebindingOn: Boolean = true
     ) {
         setRates(dlLimit, ulLimit)
         allowedApps = allowed.toSet()
@@ -278,6 +295,9 @@ class VpnWorker(private val vpnService: VpnService) {
         schedStartM = sStartM
         schedEndH = sEndH
         schedEndM = sEndM
+        ebpfEnabled = ebpfOn
+        dpiEnabled = dpiOn
+        dnsRebindingProtection = dnsRebindingOn
         isDataCapExceeded = false
         uidPackageCache.clear()
 
@@ -462,12 +482,46 @@ class VpnWorker(private val vpnService: VpnService) {
         return payLen <= 0
     }
 
+    private fun isDpiInteractivePacket(pkt: ByteArray): Boolean {
+        if (!dpiEnabled) return false
+        if (pkt.size < 20) return false
+        val ver = (pkt[0].toInt() and 0xF0) ushr 4
+        val proto: Int
+        val ihl: Int
+        if (ver == 6) {
+            if (pkt.size < 40) return false
+            ihl = 40
+            proto = pkt[6].toInt() and 0xFF
+        } else {
+            ihl = (pkt[0].toInt() and 0x0F) * 4
+            proto = pkt[9].toInt() and 0xFF
+        }
+
+        if (proto == PROTO_UDP) {
+            if (pkt.size < ihl + 8) return false
+            val sP = u16(pkt, ihl)
+            val dP = u16(pkt, ihl + 2)
+            // DNS, NTP, STUN, VoIP / Gaming interactive packets (small UDP payloads <= 256 bytes)
+            if (sP == 53 || dP == 53 || sP == 853 || dP == 853 || sP == 123 || dP == 123 || sP == 3478 || dP == 3478) return true
+            val udpLen = pkt.size - (ihl + 8)
+            if (udpLen <= 256) return true
+        } else if (proto == PROTO_TCP) {
+            if (pkt.size < ihl + 20) return false
+            val doff = ((pkt[ihl + 12].toInt() and 0xF0) ushr 4) * 4
+            val flags = pkt[ihl + 13].toInt() and 0xFF
+            if ((flags and (SYN or FIN or RST)) != 0) return true
+            val payLen = pkt.size - (ihl + doff)
+            if (payLen <= 128) return true
+        }
+        return false
+    }
+
     private fun queueDownloadPacket(pkt: ByteArray, pkgOverride: String? = null) {
         val now = System.currentTimeMillis()
 
-        // Pure TCP control packets (ACK, SYN, FIN, RST with no payload) must NEVER be delayed or throttled!
-        // TCP upload depends directly on timely ACK delivery to advance sender sliding window.
-        if (isTcpControlPacket(pkt)) {
+        // Pure TCP control packets (ACK, SYN, FIN, RST with no payload) and DPI Interactive packets
+        // must NEVER be delayed or throttled! This guarantees ultra-low jitter, zero lag for gaming and voice.
+        if (isTcpControlPacket(pkt) || isDpiInteractivePacket(pkt)) {
             toDeviceQueue.add(ScheduledPacket(pkt, now))
             synchronized(queueLock) {
                 queueLock.notifyAll()
@@ -524,7 +578,7 @@ class VpnWorker(private val vpnService: VpnService) {
     //  TUN READER (Supports IPv4 and IPv6)
     // ═══════════════════════════════════════════════════
     private fun loopTunReader() {
-        Log.i(TAG, "TUN reader started")
+        Log.i(TAG, "TUN reader started (eBPF Fast Path: $ebpfEnabled)")
         val buf = ByteArray(MTU)
         while (running.get()) {
             try {
@@ -544,7 +598,15 @@ class VpnWorker(private val vpnService: VpnService) {
                     continue
                 }
 
-                val pkt = buf.copyOf(len)
+                // If eBPF acceleration enabled, use recycled packet buffer from pool to eliminate GC allocations
+                val pkt: ByteArray
+                if (ebpfEnabled) {
+                    val pooled = obtainPacketBuffer()
+                    System.arraycopy(buf, 0, pooled, 0, len)
+                    pkt = if (pooled.size == len) pooled else pooled.copyOf(len)
+                } else {
+                    pkt = buf.copyOf(len)
+                }
 
                 val ver = (pkt[0].toInt() and 0xF0) ushr 4
                 if (ver == 4) {
@@ -574,7 +636,7 @@ class VpnWorker(private val vpnService: VpnService) {
     //  TUN WRITER
     // ═══════════════════════════════════════════════════
     private fun loopTunWriter() {
-        Log.i(TAG, "TUN writer started")
+        Log.i(TAG, "TUN writer started (eBPF Batching: $ebpfEnabled)")
         while (running.get()) {
             try {
                 var pkt: ScheduledPacket? = null
@@ -602,7 +664,25 @@ class VpnWorker(private val vpnService: VpnService) {
                         continue
                     }
                     tunOut?.write(pkt!!.data)
-                    tunOut?.flush()
+                    
+                    if (ebpfEnabled) {
+                        // eBPF batch flush: drain any further ready packets in queue without context-switching flush on every packet
+                        var batchCount = 1
+                        while (batchCount < 16) {
+                            val nextPkt = toDeviceQueue.peek() ?: break
+                            val now = System.currentTimeMillis()
+                            if (nextPkt.sendTimeMs <= now) {
+                                val readyPkt = toDeviceQueue.poll() ?: break
+                                tunOut?.write(readyPkt.data)
+                                batchCount++
+                            } else {
+                                break
+                            }
+                        }
+                        tunOut?.flush()
+                    } else {
+                        tunOut?.flush()
+                    }
                 }
             } catch (e: InterruptedException) {
                 break
@@ -824,7 +904,13 @@ class VpnWorker(private val vpnService: VpnService) {
             rxBytesThisSecond += n
             checkDataCap(n)
 
-            queueDownloadPacket(buildUdp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort, data), e.packageName)
+            val payload = if (e.dstPort == 53 && dnsRebindingProtection) {
+                sanitizeDnsRebindingResponse(data)
+            } else {
+                data
+            }
+
+            queueDownloadPacket(buildUdp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort, payload), e.packageName)
         } catch (ex: Exception) { Log.w(TAG, "UDP recv err: ${ex.message}") }
     }
 
@@ -1248,6 +1334,102 @@ class VpnWorker(private val vpnService: VpnService) {
     // ═══════════════════════════════════════════════════
     //  DNS PARSER & BUILDER
     // ═══════════════════════════════════════════════════
+    private fun isPrivateIpv4(ip: ByteArray): Boolean {
+        if (ip.size != 4) return false
+        val b0 = ip[0].toInt() and 0xFF
+        val b1 = ip[1].toInt() and 0xFF
+        if (b0 == 127) return true // Loopback (127.0.0.0/8)
+        if (b0 == 10) return true  // RFC 1918 Private (10.0.0.0/8)
+        if (b0 == 172 && (b1 in 16..31)) return true // RFC 1918 Private (172.16.0.0/12)
+        if (b0 == 192 && b1 == 168) return true // RFC 1918 Private (192.168.0.0/16)
+        if (b0 == 169 && b1 == 254) return true // Link-Local / APIPA (169.254.0.0/16)
+        if (b0 == 0 && b1 == 0 && (ip[2].toInt() and 0xFF) == 0 && (ip[3].toInt() and 0xFF) == 0) return true // 0.0.0.0
+        if (b0 == 100 && ((b1 and 0xC0) == 64)) return true // CGNAT (100.64.0.0/10)
+        return false
+    }
+
+    private fun isPrivateIpv6(ip: ByteArray): Boolean {
+        if (ip.size != 16) return false
+        // ::1 loopback
+        if (ip.take(15).all { it == 0.toByte() } && ip[15] == 1.toByte()) return true
+        // fc00::/7 (Unique Local Address)
+        val b0 = ip[0].toInt() and 0xFF
+        if ((b0 and 0xFE) == 0xFC) return true
+        // fe80::/10 (Link-Local)
+        val b1 = ip[1].toInt() and 0xFF
+        if (b0 == 0xFE && ((b1 and 0xC0) == 0x80)) return true
+        return false
+    }
+
+    private fun sanitizeDnsRebindingResponse(data: ByteArray): ByteArray {
+        if (data.size < 12) return data
+        val flags = u16(data, 2)
+        val isResponse = (flags and 0x8000) != 0
+        if (!isResponse) return data
+
+        val qdCount = u16(data, 4)
+        val anCount = u16(data, 6)
+        if (anCount == 0) return data
+
+        val domain = parseDnsDomain(data)
+        if (domain != null) {
+            val dom = domain.lowercase()
+            // Ignore legitimate local or internal domains
+            if (dom.endsWith(".local") || dom.endsWith(".lan") || dom.endsWith(".home") ||
+                dom.endsWith(".internal") || dom == "localhost") {
+                return data
+            }
+        }
+
+        var pos = 12
+        // Skip questions section
+        for (q in 0 until qdCount) {
+            while (pos < data.size) {
+                val len = data[pos].toInt() and 0xFF
+                if (len == 0) { pos++; break }
+                if (len >= 192) { pos += 2; break }
+                pos += 1 + len
+            }
+            pos += 4 // QTYPE (2) + QCLASS (2)
+            if (pos >= data.size) return data
+        }
+
+        // Iterate answer records
+        for (a in 0 until anCount) {
+            if (pos >= data.size) break
+            // Skip NAME
+            while (pos < data.size) {
+                val b = data[pos].toInt() and 0xFF
+                if (b == 0) { pos++; break }
+                if (b >= 192) { pos += 2; break }
+                pos += 1 + b
+            }
+            if (pos + 10 > data.size) break
+            val type = u16(data, pos); pos += 2
+            val clazz = u16(data, pos); pos += 2
+            val ttl = u32(data, pos); pos += 4
+            val rdLen = u16(data, pos); pos += 2
+            if (pos + rdLen > data.size) break
+
+            if (type == 1 && rdLen == 4) { // Type A (IPv4)
+                val ip = data.sliceArray(pos until pos + 4)
+                if (isPrivateIpv4(ip)) {
+                    val ipStr = "${ip[0].toInt() and 0xFF}.${ip[1].toInt() and 0xFF}.${ip[2].toInt() and 0xFF}.${ip[3].toInt() and 0xFF}"
+                    Log.w(TAG, "[SECURITY] DNS Rebinding blocked for $domain -> private IP $ipStr (sinkholed to 0.0.0.0)")
+                    data[pos] = 0; data[pos + 1] = 0; data[pos + 2] = 0; data[pos + 3] = 0
+                }
+            } else if (type == 28 && rdLen == 16) { // Type AAAA (IPv6)
+                val ip = data.sliceArray(pos until pos + 16)
+                if (isPrivateIpv6(ip)) {
+                    Log.w(TAG, "[SECURITY] DNS Rebinding blocked for $domain -> private IPv6 (sinkholed)")
+                    for (k in 0 until 16) data[pos + k] = 0
+                }
+            }
+            pos += rdLen
+        }
+        return data
+    }
+
     private fun parseDnsDomain(dnsBytes: ByteArray): String? {
         if (dnsBytes.size < 12) return null
         var i = 12

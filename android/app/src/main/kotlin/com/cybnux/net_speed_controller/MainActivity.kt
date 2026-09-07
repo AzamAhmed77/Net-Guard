@@ -48,12 +48,25 @@ class MainActivity: FlutterActivity() {
     private var pendingDnsServers: List<String> = emptyList()
     private var pendingAppSpeedConfigs: String = ""
     private var pendingLockdownScreenOff: Boolean = false
+    private var pendingEbpfEnabled: Boolean = true
+    private var pendingDpiEnabled: Boolean = true
+    private var pendingDnsRebindingProtection: Boolean = true
     
     private var methodResult: MethodChannel.Result? = null
     private var flutterChannel: MethodChannel? = null
 
     companion object {
-        var instance: MainActivity? = null
+        private const val CHANNEL = "com.cybnux.netspeed/controller"
+        @Volatile var instance: MainActivity? = null
+    }
+
+    override fun onResume() {
+        super.onResume()
+        instance = this
+        // Notify Flutter whenever the app returns to foreground to refresh VPN and notification state
+        runOnUiThread {
+            flutterChannel?.invokeMethod("onToggleVpnFromNotification", null)
+        }
     }
 
     fun toggleVpnFromNative() {
@@ -138,6 +151,9 @@ class MainActivity: FlutterActivity() {
                     val schedEndM = call.argument<Int>("schedEndM") ?: 0
                     val appSpeedConfigs = call.argument<String>("appSpeedConfigs") ?: ""
                     val lockdownScreenOff = call.argument<Boolean>("lockdownScreenOff") ?: false
+                    val ebpfEnabled = call.argument<Boolean>("ebpfEnabled") ?: true
+                    val dpiEnabled = call.argument<Boolean>("dpiEnabled") ?: true
+                    val dnsRebindingProtection = call.argument<Boolean>("dnsRebindingProtection") ?: true
                     
                     pendingDownloadLimit = download
                     pendingUploadLimit = upload
@@ -160,6 +176,9 @@ class MainActivity: FlutterActivity() {
                     pendingSchedEndM = schedEndM
                     pendingAppSpeedConfigs = appSpeedConfigs
                     pendingLockdownScreenOff = lockdownScreenOff
+                    pendingEbpfEnabled = ebpfEnabled
+                    pendingDpiEnabled = dpiEnabled
+                    pendingDnsRebindingProtection = dnsRebindingProtection
                     
                     methodResult = result
                     
@@ -167,7 +186,7 @@ class MainActivity: FlutterActivity() {
                     if (intent != null) {
                         this@MainActivity.startActivityForResult(intent, VPN_REQUEST_CODE)
                     } else {
-                        startVpnService(download, upload, allowedApps, blockedWifiApps, blockedDataApps, blockAllFirewall, allowedFirewallApps, dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked, dnsServers, dataCapBytes, dataCapAction, schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM, appSpeedConfigs, lockdownScreenOff)
+                        startVpnService(download, upload, allowedApps, blockedWifiApps, blockedDataApps, blockAllFirewall, allowedFirewallApps, dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked, dnsServers, dataCapBytes, dataCapAction, schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM, appSpeedConfigs, lockdownScreenOff, ebpfEnabled, dpiEnabled, dnsRebindingProtection)
                         result.success(true)
                     }
                 }
@@ -197,8 +216,11 @@ class MainActivity: FlutterActivity() {
                     val schedEndM = call.argument<Int>("schedEndM") ?: 0
                     val appSpeedConfigs = call.argument<String>("appSpeedConfigs") ?: ""
                     val lockdownScreenOff = call.argument<Boolean>("lockdownScreenOff") ?: false
+                    val ebpfEnabled = call.argument<Boolean>("ebpfEnabled") ?: true
+                    val dpiEnabled = call.argument<Boolean>("dpiEnabled") ?: true
+                    val dnsRebindingProtection = call.argument<Boolean>("dnsRebindingProtection") ?: true
  
-                    updateVpnSettings(download, upload, allowedApps, blockedWifiApps, blockedDataApps, blockAllFirewall, allowedFirewallApps, dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked, dnsServers, dataCapBytes, dataCapAction, schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM, appSpeedConfigs, lockdownScreenOff)
+                    updateVpnSettings(download, upload, allowedApps, blockedWifiApps, blockedDataApps, blockAllFirewall, allowedFirewallApps, dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked, dnsServers, dataCapBytes, dataCapAction, schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM, appSpeedConfigs, lockdownScreenOff, ebpfEnabled, dpiEnabled, dnsRebindingProtection)
                     result.success(true)
                 }
                 "isVpnRunning" -> {
@@ -1028,7 +1050,10 @@ class MainActivity: FlutterActivity() {
                     pendingDataCapBytes, pendingDataCapAction,
                     pendingSchedEnabled, pendingSchedStartH, pendingSchedStartM, pendingSchedEndH, pendingSchedEndM,
                     pendingAppSpeedConfigs,
-                    pendingLockdownScreenOff
+                    pendingLockdownScreenOff,
+                    pendingEbpfEnabled,
+                    pendingDpiEnabled,
+                    pendingDnsRebindingProtection
                 )
                 methodResult?.success(true)
             } else {
@@ -1049,7 +1074,10 @@ class MainActivity: FlutterActivity() {
         dataCapBytes: Long, dataCapAction: String,
         schedEnabled: Boolean, schedStartH: Int, schedStartM: Int, schedEndH: Int, schedEndM: Int,
         appSpeedConfigs: String,
-        lockdownScreenOff: Boolean = false
+        lockdownScreenOff: Boolean = false,
+        ebpfEnabled: Boolean = true,
+        dpiEnabled: Boolean = true,
+        dnsRebindingProtection: Boolean = true
     ) {
         val intent = Intent(this@MainActivity, MyVpnService::class.java).apply {
             action = MyVpnService.ACTION_START
@@ -1074,6 +1102,9 @@ class MainActivity: FlutterActivity() {
             putExtra(MyVpnService.EXTRA_SCHED_END_M, schedEndM)
             putExtra(MyVpnService.EXTRA_APP_SPEED_CONFIGS, appSpeedConfigs)
             putExtra(MyVpnService.EXTRA_LOCKDOWN_SCREEN_OFF, lockdownScreenOff)
+            putExtra(MyVpnService.EXTRA_EBPF_ENABLED, ebpfEnabled)
+            putExtra(MyVpnService.EXTRA_DPI_ENABLED, dpiEnabled)
+            putExtra(MyVpnService.EXTRA_DNS_REBINDING, dnsRebindingProtection)
         }
 
         // Save settings to native storage for persistence across reboots
@@ -1086,7 +1117,10 @@ class MainActivity: FlutterActivity() {
             schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
             appSpeedConfigs,
             vpnActive = true,
-            lockdownScreenOff = lockdownScreenOff
+            lockdownScreenOff = lockdownScreenOff,
+            ebpfEnabled = ebpfEnabled,
+            dpiEnabled = dpiEnabled,
+            dnsRebindingProtection = dnsRebindingProtection
         )
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -1116,7 +1150,10 @@ class MainActivity: FlutterActivity() {
         dataCapBytes: Long, dataCapAction: String,
         schedEnabled: Boolean, schedStartH: Int, schedStartM: Int, schedEndH: Int, schedEndM: Int,
         appSpeedConfigs: String,
-        lockdownScreenOff: Boolean = false
+        lockdownScreenOff: Boolean = false,
+        ebpfEnabled: Boolean = true,
+        dpiEnabled: Boolean = true,
+        dnsRebindingProtection: Boolean = true
     ) {
         // Update persistent native settings
         MyVpnService.saveSettingsToPrefs(
@@ -1128,7 +1165,10 @@ class MainActivity: FlutterActivity() {
             schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
             appSpeedConfigs,
             vpnActive = MyVpnService.isRunning,
-            lockdownScreenOff = lockdownScreenOff
+            lockdownScreenOff = lockdownScreenOff,
+            ebpfEnabled = ebpfEnabled,
+            dpiEnabled = dpiEnabled,
+            dnsRebindingProtection = dnsRebindingProtection
         )
 
         val intent = Intent(this@MainActivity, MyVpnService::class.java).apply {
@@ -1154,6 +1194,9 @@ class MainActivity: FlutterActivity() {
             putExtra(MyVpnService.EXTRA_SCHED_END_M, schedEndM)
             putExtra(MyVpnService.EXTRA_APP_SPEED_CONFIGS, appSpeedConfigs)
             putExtra(MyVpnService.EXTRA_LOCKDOWN_SCREEN_OFF, lockdownScreenOff)
+            putExtra(MyVpnService.EXTRA_EBPF_ENABLED, ebpfEnabled)
+            putExtra(MyVpnService.EXTRA_DPI_ENABLED, dpiEnabled)
+            putExtra(MyVpnService.EXTRA_DNS_REBINDING, dnsRebindingProtection)
         }
         this@MainActivity.startService(intent)
     }

@@ -60,6 +60,9 @@ class MyVpnService : VpnService() {
         const val EXTRA_SCHED_END_M = "sched_end_m"
         const val EXTRA_APP_SPEED_CONFIGS = "app_speed_configs"
         const val EXTRA_LOCKDOWN_SCREEN_OFF = "lockdown_screen_off"
+        const val EXTRA_EBPF_ENABLED = "ebpf_enabled"
+        const val EXTRA_DPI_ENABLED = "dpi_enabled"
+        const val EXTRA_DNS_REBINDING = "dns_rebinding"
 
         @Volatile var totalRxBytes: Long = 0
         @Volatile var totalTxBytes: Long = 0
@@ -97,13 +100,19 @@ class MyVpnService : VpnService() {
             schedEnabled: Boolean, schedStartH: Int, schedStartM: Int, schedEndH: Int, schedEndM: Int,
             appSpeedConfigs: String,
             vpnActive: Boolean,
-            lockdownScreenOff: Boolean = false
+            lockdownScreenOff: Boolean = false,
+            ebpfEnabled: Boolean = true,
+            dpiEnabled: Boolean = true,
+            dnsRebindingProtection: Boolean = true
         ) {
             try {
                 val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
                 prefs.edit().apply {
                     putBoolean("vpn_active", vpnActive)
                     putBoolean("lockdown_screen_off", lockdownScreenOff)
+                    putBoolean("ebpf_enabled", ebpfEnabled)
+                    putBoolean("dpi_enabled", dpiEnabled)
+                    putBoolean("dns_rebinding_protection", dnsRebindingProtection)
                     putLong("download_limit", downloadLimit)
                     putLong("upload_limit", uploadLimit)
                     putStringSet("allowed_apps", allowedApps.toSet())
@@ -166,6 +175,9 @@ class MyVpnService : VpnService() {
                 val schedEndH = prefs.getInt("sched_end_h", 0)
                 val schedEndM = prefs.getInt("sched_end_m", 0)
                 val appSpeedConfigs = prefs.getString("app_speed_configs", "") ?: ""
+                val ebpfEnabled = prefs.getBoolean("ebpf_enabled", true)
+                val dpiEnabled = prefs.getBoolean("dpi_enabled", true)
+                val dnsRebindingProtection = prefs.getBoolean("dns_rebinding_protection", true)
 
                 Intent(context, MyVpnService::class.java).apply {
                     action = ACTION_START
@@ -190,6 +202,9 @@ class MyVpnService : VpnService() {
                     putExtra(EXTRA_SCHED_END_M, schedEndM)
                     putExtra(EXTRA_APP_SPEED_CONFIGS, appSpeedConfigs)
                     putExtra(EXTRA_LOCKDOWN_SCREEN_OFF, prefs.getBoolean("lockdown_screen_off", false))
+                    putExtra(EXTRA_EBPF_ENABLED, ebpfEnabled)
+                    putExtra(EXTRA_DPI_ENABLED, dpiEnabled)
+                    putExtra(EXTRA_DNS_REBINDING, dnsRebindingProtection)
                 }
             } catch (e: Exception) {
                 Log.e("MyVpnService", "Failed to build start intent from prefs: ${e.message}")
@@ -296,6 +311,9 @@ class MyVpnService : VpnService() {
                     val schedEndM = intent.getIntExtra(EXTRA_SCHED_END_M, 0)
                     val appSpeedConfigs = intent.getStringExtra(EXTRA_APP_SPEED_CONFIGS) ?: ""
                     lockdownScreenOffEnabled = intent.getBooleanExtra(EXTRA_LOCKDOWN_SCREEN_OFF, false)
+                    val ebpfEnabled = intent.getBooleanExtra(EXTRA_EBPF_ENABLED, true)
+                    val dpiEnabled = intent.getBooleanExtra(EXTRA_DPI_ENABLED, true)
+                    val dnsRebindingProtection = intent.getBooleanExtra(EXTRA_DNS_REBINDING, true)
                     currentConfiguredDownloadLimit = downloadLimit
                     currentConfiguredUploadLimit = uploadLimit
 
@@ -304,7 +322,8 @@ class MyVpnService : VpnService() {
                         blockAllFirewall, allowedFirewallApps,
                         dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked, dnsServers,
                         dataCapBytes, dataCapAction,
-                        schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM
+                        schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
+                        ebpfEnabled, dpiEnabled, dnsRebindingProtection
                     )
                     val effectiveAppSpeedConfigs = if (appSpeedConfigs.isNotEmpty()) {
                         appSpeedConfigs
@@ -335,6 +354,9 @@ class MyVpnService : VpnService() {
                     val downloadLimit = intent.getLongExtra(EXTRA_DOWNLOAD_LIMIT, 0L)
                     val uploadLimit = intent.getLongExtra(EXTRA_UPLOAD_LIMIT, 0L)
                     lockdownScreenOffEnabled = intent.getBooleanExtra(EXTRA_LOCKDOWN_SCREEN_OFF, false)
+                    val ebpfEnabled = intent.getBooleanExtra(EXTRA_EBPF_ENABLED, true)
+                    val dpiEnabled = intent.getBooleanExtra(EXTRA_DPI_ENABLED, true)
+                    val dnsRebindingProtection = intent.getBooleanExtra(EXTRA_DNS_REBINDING, true)
                     currentConfiguredDownloadLimit = downloadLimit
                     currentConfiguredUploadLimit = uploadLimit
                     val allowedApps = intent.getStringArrayListExtra(EXTRA_ALLOWED_APPS) ?: emptyList<String>()
@@ -360,7 +382,8 @@ class MyVpnService : VpnService() {
                         blockAllFirewall, allowedFirewallApps,
                         dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked,
                         dataCapBytes, dataCapAction,
-                        schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM
+                        schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
+                        ebpfEnabled, dpiEnabled, dnsRebindingProtection
                     )
                     val effectiveUpdateConfigs = if (appSpeedConfigs.isNotEmpty()) {
                         appSpeedConfigs
@@ -400,7 +423,10 @@ class MyVpnService : VpnService() {
         dnsCustomBlocked: List<String>,
         dnsServers: List<String>,
         dataCapBytes: Long, dataCapAction: String,
-        schedEnabled: Boolean, schedStartH: Int, schedStartM: Int, schedEndH: Int, schedEndM: Int
+        schedEnabled: Boolean, schedStartH: Int, schedStartM: Int, schedEndH: Int, schedEndM: Int,
+        ebpfEnabled: Boolean = true,
+        dpiEnabled: Boolean = true,
+        dnsRebindingProtection: Boolean = true
     ) {
         // 1. Create and show foreground notification
         val notification = getVpnNotification()
@@ -475,7 +501,8 @@ class MyVpnService : VpnService() {
                 blockAllFirewall, allowedFirewallApps,
                 dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked,
                 dataCapBytes, dataCapAction,
-                schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM
+                schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
+                ebpfEnabled, dpiEnabled, dnsRebindingProtection
             )
             val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
             val savedAppSpeedConfigs = prefs.getString("app_speed_configs", "") ?: ""

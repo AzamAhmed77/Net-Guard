@@ -737,6 +737,9 @@ class VpnManager extends ChangeNotifier {
         schedEndM: config.schedEndM,
         appSpeedConfigs: appSpeedConfigsJson,
         lockdownScreenOff: lockdownOnScreenOff,
+        ebpfEnabled: config.ebpfEnabled,
+        dpiEnabled: config.dpiEnabled,
+        dnsRebindingProtection: config.dnsRebindingProtection,
       );
 
       if (started) {
@@ -875,6 +878,9 @@ class VpnManager extends ChangeNotifier {
       schedEndM: config.schedEndM,
       appSpeedConfigs: appSpeedConfigsJson,
       lockdownScreenOff: lockdownOnScreenOff,
+      ebpfEnabled: config.ebpfEnabled,
+      dpiEnabled: config.dpiEnabled,
+      dnsRebindingProtection: config.dnsRebindingProtection,
     );
   }
 

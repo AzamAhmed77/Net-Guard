@@ -27,6 +27,9 @@ class MethodChannelService {
     int schedEndM = 0,
     String appSpeedConfigs = '',
     bool lockdownScreenOff = false,
+    bool ebpfEnabled = true,
+    bool dpiEnabled = true,
+    bool dnsRebindingProtection = true,
   }) async {
     try {
       final bool success = await _channel.invokeMethod('startVpn', {
@@ -51,6 +54,9 @@ class MethodChannelService {
         'schedEndM': schedEndM,
         'appSpeedConfigs': appSpeedConfigs,
         'lockdownScreenOff': lockdownScreenOff,
+        'ebpfEnabled': ebpfEnabled,
+        'dpiEnabled': dpiEnabled,
+        'dnsRebindingProtection': dnsRebindingProtection,
       });
       return success;
     } on PlatformException catch (e) {
@@ -146,6 +152,9 @@ class MethodChannelService {
     int schedEndM = 0,
     String appSpeedConfigs = '',
     bool lockdownScreenOff = false,
+    bool ebpfEnabled = true,
+    bool dpiEnabled = true,
+    bool dnsRebindingProtection = true,
   }) async {
     try {
       await _channel.invokeMethod('updateSettings', {
@@ -170,6 +179,9 @@ class MethodChannelService {
         'schedEndM': schedEndM,
         'appSpeedConfigs': appSpeedConfigs,
         'lockdownScreenOff': lockdownScreenOff,
+        'ebpfEnabled': ebpfEnabled,
+        'dpiEnabled': dpiEnabled,
+        'dnsRebindingProtection': dnsRebindingProtection,
       });
     } on PlatformException catch (e) {
       debugPrint("Failed to update settings: '${e.message}'.");
