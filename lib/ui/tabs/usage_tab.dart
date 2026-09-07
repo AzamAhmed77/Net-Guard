@@ -750,7 +750,7 @@ class _UsageTabState extends State<UsageTab> {
                     itemCount: filtered.length + 1, // +1 for bottom padding
                     itemBuilder: (context, index) {
                       if (index == filtered.length) {
-                        return const SizedBox(height: 90);
+                        return const SizedBox(height: 16);
                       }
 
                       final entry = filtered[index];

@@ -286,7 +286,7 @@ class _FirewallTabState extends State<FirewallTab> {
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.only(left: 16, right: 16, top: 4, bottom: 100),
+                      padding: const EdgeInsets.only(left: 16, right: 16, top: 4, bottom: 16),
                       itemCount: filteredApps.length,
                       itemBuilder: (context, index) {
                         final app = filteredApps[index];

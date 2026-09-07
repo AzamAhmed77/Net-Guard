@@ -157,24 +157,22 @@ class _RootScreenState extends State<RootScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Stack(
-        children: [
-          IndexedStack(
-            index: _activeTab,
-            children: _tabs,
-          ),
-          if (!isKeyboardOpen)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: BottomDockWidget(
-                activeTab: _activeTab,
-                onTabSelected: (index) => setState(() => _activeTab = index),
+      body: IndexedStack(
+        index: _activeTab,
+        children: _tabs,
+      ),
+      bottomNavigationBar: isKeyboardOpen
+          ? null
+          : Container(
+              color: AppColors.bgDark,
+              child: SafeArea(
+                top: false,
+                child: BottomDockWidget(
+                  activeTab: _activeTab,
+                  onTabSelected: (index) => setState(() => _activeTab = index),
+                ),
               ),
             ),
-        ],
-      ),
     );
   }
 }

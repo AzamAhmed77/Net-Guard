@@ -400,7 +400,7 @@ class _HistoryTabState extends State<HistoryTab> {
               ),
             );
           }),
-        const SizedBox(height: 100),
+        const SizedBox(height: 16),
       ],
     );
   }

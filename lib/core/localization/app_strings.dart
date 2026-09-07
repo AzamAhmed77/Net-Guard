@@ -274,7 +274,7 @@ class AppStrings {
   String get aboutCopyright => isAr ? '© 2025 Net Guard Security. جميع الحقوق محفوظة.' : '© 2025 Net Guard Security. All rights reserved.';
 
   // ── Expert Settings Modal ──
-  String get expertSettingsTitle => isAr ? 'الإعدادات المتقدمة (Expert Settings)' : 'Expert Settings';
+  String get expertSettingsTitle => isAr ? 'الإعدادات المتقدمة' : 'Expert Settings';
   String get ebpfTitle => isAr ? 'وحدة تسريع النواة eBPF Kernel' : 'eBPF Kernel Acceleration';
   String get ebpfDesc => isAr ? 'فلترة الحزم وتقييد السرعة داخل Kernel Space لتوفير البطارية' : 'Kernel-level packet filtering & throttling to save battery';
   String get dpiTitle => isAr ? 'تحليل الحزم العميق (DPI Inspection)' : 'Deep Packet Inspection (DPI)';

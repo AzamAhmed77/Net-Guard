@@ -25,8 +25,8 @@ class BottomDockWidget extends StatelessWidget {
     ];
 
     return Container(
-      margin: const EdgeInsets.only(left: 12, right: 12, bottom: 16, top: 4),
-      height: 64,
+      margin: const EdgeInsets.only(left: 14, right: 14, bottom: 8, top: 4),
+      height: 62,
       decoration: BoxDecoration(
         color: AppColors.surfaceCardDark,
         borderRadius: BorderRadius.circular(22),
