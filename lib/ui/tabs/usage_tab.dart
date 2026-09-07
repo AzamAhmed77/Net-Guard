@@ -97,11 +97,11 @@ class _UsageTabState extends State<UsageTab> {
   }
 
   String _formatMb(double mb) {
-    if (mb <= 0.05) return '0.0 MB';
+    if (mb <= 0.05) return '\u200E0.0 MB';
     if (mb >= 1024) {
-      return '${(mb / 1024).toStringAsFixed(2)} GB';
+      return '\u200E${(mb / 1024).toStringAsFixed(2)} GB';
     }
-    return '${mb.toStringAsFixed(2)} MB';
+    return '\u200E${mb.toStringAsFixed(2)} MB';
   }
 
   String _getSessionLabel(AppStrings strings) {

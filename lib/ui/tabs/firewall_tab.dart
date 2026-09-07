@@ -24,11 +24,11 @@ class _FirewallTabState extends State<FirewallTab> {
   }
 
   String _formatMb(double mb) {
-    if (mb <= 0.05) return '0.0 MB';
+    if (mb <= 0.05) return '\u200E0.0 MB';
     if (mb >= 1024) {
-      return '${(mb / 1024).toStringAsFixed(1)} GB';
+      return '\u200E${(mb / 1024).toStringAsFixed(1)} GB';
     }
-    return '${mb.toStringAsFixed(1)} MB';
+    return '\u200E${mb.toStringAsFixed(1)} MB';
   }
 
   @override
@@ -301,7 +301,7 @@ class _FirewallTabState extends State<FirewallTab> {
   Widget _buildFilterChip(String label, String key, VpnManager vpn, AppStrings strings) {
     final isSelected = _activeFilter == key;
     final displayLabel = (key == 'custom' && vpn.customizedAppsCount > 0)
-        ? '$label (${vpn.customizedAppsCount})'
+        ? '$label \u202A(${vpn.customizedAppsCount})\u202C'
         : label;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -756,7 +756,7 @@ class _FirewallTabState extends State<FirewallTab> {
                               child: Text(
                                 customKbps == 0
                                     ? (strings.isAr ? 'كتم كامل' : 'Muted')
-                                    : '$customKbps KB/s',
+                                    : '\u200E$customKbps KB/s',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -795,7 +795,7 @@ class _FirewallTabState extends State<FirewallTab> {
                               style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                             ),
                             Text(
-                              '4096 KB/s',
+                              '\u200E4096 KB/s',
                               style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                             ),
                           ],

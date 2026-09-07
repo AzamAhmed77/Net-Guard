@@ -414,13 +414,6 @@ class MyVpnService : VpnService() {
             builder.addAddress("10.0.0.1", 24)
             builder.addRoute("0.0.0.0", 0) // Route all IPv4 traffic
             
-            // IPv6 config to trap and drop IPv6, forcing IPv4 fallback
-            try {
-                builder.addAddress("2001:db8::1", 64)
-                builder.addRoute("::", 0)
-            } catch (e: Exception) {
-                Log.w(TAG, "IPv6 not supported by system VPN builder: ${e.message}")
-            }
             
             if (dnsServers.isNotEmpty()) {
                 for (dns in dnsServers) {

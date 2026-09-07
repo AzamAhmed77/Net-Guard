@@ -13,11 +13,11 @@ class DashboardTab extends StatefulWidget {
 
 class _DashboardTabState extends State<DashboardTab> {
   String _formatSpeed(double kbps) {
-    if (kbps <= 0) return '0 KB/s';
+    if (kbps <= 0) return '\u200E0 KB/s';
     if (kbps >= 1024) {
-      return '${(kbps / 1024).toStringAsFixed(1)} MB/s';
+      return '\u200E${(kbps / 1024).toStringAsFixed(1)} MB/s';
     }
-    return '${kbps.toStringAsFixed(0)} KB/s';
+    return '\u200E${kbps.toStringAsFixed(0)} KB/s';
   }
 
   @override
@@ -288,7 +288,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            isDownloadUnlimited ? strings.noLimitsInfinite : '$dlLimit KB/s',
+                            isDownloadUnlimited ? strings.noLimitsInfinite : '\u200E$dlLimit KB/s',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -369,7 +369,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            isUploadUnlimited ? strings.noLimitsInfinite : '$ulLimit KB/s',
+                            isUploadUnlimited ? strings.noLimitsInfinite : '\u200E$ulLimit KB/s',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,

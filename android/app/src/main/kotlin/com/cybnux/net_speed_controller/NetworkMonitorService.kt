@@ -377,14 +377,14 @@ class NetworkMonitorService : Service() {
         val wifiStr = formatBytes(wifiBytes)
         val mobileStr = formatBytes(mobileBytes)
 
-        val line1 = "↓ $downStr    •    ↑ $upStr"
-        val line2 = if (isEn) "WiFi: $wifiStr   •   Mobile: $mobileStr" else "واي فاي: $wifiStr   •   بيانات: $mobileStr"
+        val line1 = "\u200E↓ $downStr    •    ↑ $upStr"
+        val line2 = if (isEn) "WiFi: $wifiStr   •   Mobile: $mobileStr" else "واي فاي: \u200E$wifiStr   •   بيانات: \u200E$mobileStr"
 
         val isVpnActive = MyVpnService.isRunning
         val subText = if (isEn) {
-            if (isVpnActive) "Net Guard • Protection Active 🟢" else "Net Guard • Monitoring Only ⚪"
+            if (isVpnActive) "Protection Active 🟢" else "Monitoring Only ⚪"
         } else {
-            if (isVpnActive) "Net Guard • حماية نشطة 🟢" else "Net Guard • مراقبة فقط ⚪"
+            if (isVpnActive) "حماية نشطة 🟢" else "مراقبة فقط ⚪"
         }
 
         latestLine1 = line1

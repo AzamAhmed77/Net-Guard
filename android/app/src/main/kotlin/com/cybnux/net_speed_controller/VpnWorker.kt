@@ -409,10 +409,41 @@ class VpnWorker(private val vpnService: VpnService) {
         (vpnService as? MyVpnService)?.triggerDataCapReached(dataCapAction)
     }
 
+    private fun isTcpControlPacket(pkt: ByteArray): Boolean {
+        if (pkt.size < 20) return false
+        val ver = (pkt[0].toInt() and 0xF0) ushr 4
+        val proto: Int
+        val ihl: Int
+        if (ver == 6) {
+            if (pkt.size < 40) return false
+            ihl = 40
+            proto = pkt[6].toInt() and 0xFF
+        } else {
+            ihl = (pkt[0].toInt() and 0x0F) * 4
+            proto = pkt[9].toInt() and 0xFF
+        }
+        if (proto != PROTO_TCP) return false
+        if (pkt.size < ihl + 20) return false
+        val doff = ((pkt[ihl + 12].toInt() and 0xF0) ushr 4) * 4
+        val payLen = pkt.size - (ihl + doff)
+        return payLen <= 0
+    }
+
     private fun queueDownloadPacket(pkt: ByteArray) {
+        val now = System.currentTimeMillis()
+
+        // Pure TCP control packets (ACK, SYN, FIN, RST with no payload) must NEVER be delayed or throttled!
+        // TCP upload depends directly on timely ACK delivery to advance sender sliding window.
+        if (isTcpControlPacket(pkt)) {
+            toDeviceQueue.add(ScheduledPacket(pkt, now))
+            synchronized(queueLock) {
+                queueLock.notifyAll()
+            }
+            return
+        }
+
         val pkg = getDownloadPacketPackage(pkt)
         val shouldThrottle = shouldThrottleApp(pkg)
-        val now = System.currentTimeMillis()
         val sendTime: Long
 
         if (shouldThrottle) {
@@ -1493,9 +1524,6 @@ class VpnWorker(private val vpnService: VpnService) {
         
         if (proto == PROTO_TCP) {
             if (pkt.size < ihl + 20) return null
-            val doff = ((pkt[ihl + 12].toInt() and 0xF0) ushr 4) * 4
-            val payLen = pkt.size - (ihl + doff)
-            if (payLen <= 0) return null
         } else {
             val payLen = pkt.size - (ihl + 8)
             if (payLen <= 0) return null

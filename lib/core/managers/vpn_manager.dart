@@ -516,7 +516,7 @@ class VpnManager extends ChangeNotifier {
         : mode == 'unlimited'
             ? (isArabic ? 'مفتوح (غير مقيد ∞)' : 'Unlimited (∞)')
             : (isArabic
-                ? 'مخصص (${customSpeedKbps == 0 ? '0 KB/s كتم' : '$customSpeedKbps KB/s'})'
+                ? 'مخصص \u202A(${customSpeedKbps == 0 ? '0 KB/s كتم' : '\u200E$customSpeedKbps KB/s'})\u202C'
                 : 'Custom (${customSpeedKbps == 0 ? '0 KB/s Muted' : '$customSpeedKbps KB/s'})');
     addLog("INFO", isArabic
         ? "سرعة ${app.name} → $modeTitle"
@@ -905,10 +905,10 @@ class VpnManager extends ChangeNotifier {
     syncNativeSettings();
     final dlStr = downloadKbps == -1
         ? (isArabic ? 'غير محدود' : 'Unlimited')
-        : '$downloadKbps KB/s';
+        : '\u200E$downloadKbps KB/s';
     final ulStr = uploadKbps == -1
         ? (isArabic ? 'غير محدود' : 'Unlimited')
-        : '$uploadKbps KB/s';
+        : '\u200E$uploadKbps KB/s';
     addLog("INFO", isArabic
         ? "تم تطبيق سرعة مخصصة: تنزيل $dlStr | رفع $ulStr"
         : "Custom speed limits applied: Down $dlStr | Up $ulStr");
