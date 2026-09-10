@@ -8,12 +8,14 @@ class UsageDonutChart extends StatefulWidget {
   final List<MapEntry<AppInfo, double>> usageList;
   final double totalUsage;
   final AppStrings strings;
+  final EdgeInsetsGeometry? margin;
 
   const UsageDonutChart({
     super.key,
     required this.usageList,
     required this.totalUsage,
     required this.strings,
+    this.margin,
   });
 
   @override
@@ -66,7 +68,7 @@ class _UsageDonutChartState extends State<UsageDonutChart> {
     if (slices.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: widget.margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceCardDark,

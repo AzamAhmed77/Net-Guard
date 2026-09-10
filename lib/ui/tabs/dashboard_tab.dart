@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/managers/vpn_manager.dart';
+import '../../core/models/app_info.dart';
 import '../../core/themes/app_colors.dart';
 import '../../core/localization/app_strings.dart';
+import '../../core/services/method_channel_service.dart';
+import '../widgets/usage_donut_chart.dart';
 
 class DashboardTab extends StatefulWidget {
   const DashboardTab({super.key});
@@ -12,6 +15,39 @@ class DashboardTab extends StatefulWidget {
 }
 
 class _DashboardTabState extends State<DashboardTab> {
+  Map<String, double> _wifiTraffic = {};
+  Map<String, double> _mobileTraffic = {};
+  double _totalWifiMb = 0.0;
+  double _totalMobileMb = 0.0;
+  bool _hasLoadedTraffic = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodayTraffic();
+  }
+
+  Future<void> _loadTodayTraffic() async {
+    try {
+      final data = await MethodChannelService.getPerAppTrafficByNetwork(
+        session: 'today',
+      );
+      if (mounted) {
+        setState(() {
+          _wifiTraffic = Map<String, double>.from(
+            (data['wifi'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toDouble())) ?? {},
+          );
+          _mobileTraffic = Map<String, double>.from(
+            (data['mobile'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toDouble())) ?? {},
+          );
+          _totalWifiMb = (data['totalWifiMb'] as num?)?.toDouble() ?? 0.0;
+          _totalMobileMb = (data['totalMobileMb'] as num?)?.toDouble() ?? 0.0;
+          _hasLoadedTraffic = true;
+        });
+      }
+    } catch (_) {}
+  }
+
   String _formatSpeed(double kbps) {
     if (kbps <= 0) return '\u200E0 KB/s';
     if (kbps >= 1024) {
@@ -29,6 +65,49 @@ class _DashboardTabState extends State<DashboardTab> {
     final isDownloadUnlimited = dlLimit < 0;
     final ulLimit = vpn.config.uploadSpeedLimit;
     final isUploadUnlimited = ulLimit < 0;
+
+    // Build per-app usage list for the donut chart
+    final List<AppInfo> allApps = List<AppInfo>.from(vpn.apps);
+    final existingPkgs = allApps.map((a) => a.packageName).toSet();
+    final allTrafficPkgs = {..._wifiTraffic.keys, ..._mobileTraffic.keys};
+
+    for (final pkg in allTrafficPkgs) {
+      if (!existingPkgs.contains(pkg)) {
+        if (pkg == 'com.cybnux.tethering_hotspot') {
+          allApps.add(AppInfo(
+            name: vpn.isArabic ? 'نقطة اتصال الهواتف (بث)' : 'Tethering & Hotspot',
+            packageName: pkg,
+            isSystem: true,
+          ));
+        } else if (pkg == 'com.cybnux.uninstalled_apps') {
+          allApps.add(AppInfo(
+            name: vpn.isArabic ? 'تطبيقات محذوفة' : 'Uninstalled Applications',
+            packageName: pkg,
+            isSystem: false,
+          ));
+        } else {
+          allApps.add(AppInfo(
+            name: pkg,
+            packageName: pkg,
+            isSystem: false,
+          ));
+        }
+        existingPkgs.add(pkg);
+      }
+    }
+
+    final List<MapEntry<AppInfo, double>> usageList = allApps
+        .map((app) {
+          final usage = (_wifiTraffic[app.packageName] ?? 0.0) + (_mobileTraffic[app.packageName] ?? 0.0);
+          return MapEntry(app, usage);
+        })
+        .where((entry) => entry.value > 0.01)
+        .toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final totalUsage = (_totalWifiMb + _totalMobileMb) > 0
+        ? (_totalWifiMb + _totalMobileMb)
+        : usageList.fold(0.0, (s, e) => s + e.value);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -412,6 +491,19 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
         ),
         const SizedBox(height: 22),
+
+        // ==========================================
+        // 3. DATA USAGE BREAKDOWN (DONUT CHART)
+        // ==========================================
+        if (_hasLoadedTraffic && totalUsage > 0.05 && usageList.isNotEmpty) ...[
+          UsageDonutChart(
+            usageList: usageList,
+            totalUsage: totalUsage,
+            strings: strings,
+            margin: EdgeInsets.zero,
+          ),
+          const SizedBox(height: 22),
+        ],
 
         const SizedBox(height: 100),
       ],

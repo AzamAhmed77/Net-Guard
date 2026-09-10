@@ -44,7 +44,8 @@ class TcpEntry(
     var myAck: Long,
     var state: TState,
     val packageName: String?,
-    var key: SelectionKey? = null
+    var key: SelectionKey? = null,
+    var lastMs: Long = System.currentTimeMillis()
 ) {
     val writeQueue = ConcurrentLinkedQueue<ByteBuffer>()
 }
@@ -755,13 +756,13 @@ class VpnWorker(private val vpnService: VpnService) {
                     k != null && k.isValid && (k.interestOps() and SelectionKey.OP_READ) == 0
                 }
                 val selectTimeout = if (hasPausedTcp) {
-                    10L
+                    25L
                 } else if (tcpTable.isEmpty() && udpTable.isEmpty()) {
                     2000L
                 } else if (rxBytesThisSecond == 0L && txBytesThisSecond == 0L) {
-                    500L
+                    1000L
                 } else {
-                    15L
+                    50L
                 }
                 sel.select(selectTimeout)
 
@@ -1060,6 +1061,7 @@ class VpnWorker(private val vpnService: VpnService) {
         }
 
         val e = tcpTable[key] ?: return
+        e.lastMs = System.currentTimeMillis()
 
         if (fl and ACK != 0 && e.state == TState.SYN_RECV) {
             e.state = TState.ESTABLISHED
@@ -1199,6 +1201,7 @@ class VpnWorker(private val vpnService: VpnService) {
 
     private fun onInTcp(e: TcpEntry) {
         if (e.state != TState.ESTABLISHED && e.state != TState.SYN_RECV) return
+        e.lastMs = System.currentTimeMillis()
 
         val pkg = e.packageName
         val shouldThrottle = shouldThrottleApp(pkg)
@@ -1338,7 +1341,31 @@ class VpnWorker(private val vpnService: VpnService) {
     // ═══════════════════════════════════════════════════
     private fun cleanupStale() {
         val now = System.currentTimeMillis()
-        udpTable.entries.removeIf { now - it.value.lastMs > 60_000L }
+        // Clean UDP idle for > 60s
+        val staleUdp = mutableListOf<String>()
+        for ((k, u) in udpTable) {
+            if (now - u.lastMs > 60_000L) staleUdp.add(k)
+        }
+        for (k in staleUdp) {
+            val u = udpTable.remove(k) ?: continue
+            try { u.key?.cancel() } catch (_: Exception) {}
+            try { u.ch.close() } catch (_: Exception) {}
+        }
+
+        // Clean stale TCP connections to eliminate memory leaks and kernel socket drain
+        val staleTcp = mutableListOf<String>()
+        for ((k, e) in tcpTable) {
+            val idleTime = now - e.lastMs
+            val isStale = when (e.state) {
+                TState.SYN_RECV -> idleTime > 15_000L
+                TState.FIN_WAIT, TState.CLOSED -> idleTime > 10_000L
+                TState.ESTABLISHED -> idleTime > 120_000L // 2 min idle
+            }
+            if (isStale) staleTcp.add(k)
+        }
+        for (k in staleTcp) {
+            removeTcp(k)
+        }
     }
 
     private val socketUidCache = java.util.concurrent.ConcurrentHashMap<String, Int>()
@@ -1365,10 +1392,8 @@ class VpnWorker(private val vpnService: VpnService) {
         } catch (e: Exception) {
             -1
         }
-        if (uid > 0) {
-            if (socketUidCache.size > 2000) socketUidCache.clear()
-            socketUidCache[cacheKey] = uid
-        }
+        if (socketUidCache.size > 2000) socketUidCache.clear()
+        socketUidCache[cacheKey] = uid
         return uid
     }
 
@@ -1379,15 +1404,13 @@ class VpnWorker(private val vpnService: VpnService) {
             try {
                 val pm = vpnService.packageManager
                 val packages = pm.getPackagesForUid(uid)
-                if (packages != null && packages.isNotEmpty()) {
-                    cached = packages[0]
-                    uidPackageCache[uid] = cached
-                }
+                cached = if (packages != null && packages.isNotEmpty()) packages[0] else ""
+                uidPackageCache[uid] = cached
             } catch (e: Exception) {
-                Log.w(TAG, "Failed resolving UID $uid: ${e.message}")
+                uidPackageCache[uid] = ""
             }
         }
-        return cached
+        return if (cached.isNullOrEmpty()) null else cached
     }
 
     private var lastWifiCheckMs = 0L

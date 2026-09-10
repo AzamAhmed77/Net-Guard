@@ -33,7 +33,6 @@ class MyVpnService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
     private var vpnWorker: VpnWorker? = null
-    private var socksServer: LocalSocks5Server? = null
 
     companion object {
         const val ACTION_START = "com.cybnux.netspeed.START"
@@ -249,7 +248,6 @@ class MyVpnService : VpnService() {
         super.onCreate()
         instance = this
         vpnWorker = VpnWorker(this)
-        socksServer = LocalSocks5Server(this)
 
         val screenFilter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
@@ -338,9 +336,7 @@ class MyVpnService : VpnService() {
                     if (effectiveAppSpeedConfigs.isNotEmpty()) {
                         vpnWorker?.updateAppSpeedConfigs(effectiveAppSpeedConfigs)
                     }
-                    socksServer?.start(1080)
                     NetworkMonitorService.instance?.forceImmediateSpeedUpdate()
-                    socksServer?.setRates(downloadLimit, uploadLimit)
                 }
                 ACTION_STOP -> {
                     stopVpn()
@@ -352,7 +348,6 @@ class MyVpnService : VpnService() {
                     currentConfiguredDownloadLimit = downloadLimit
                     currentConfiguredUploadLimit = uploadLimit
                     vpnWorker?.setRates(downloadLimit, uploadLimit)
-                    socksServer?.setRates(downloadLimit, uploadLimit)
                 }
                 ACTION_UPDATE_SETTINGS -> {
                     val downloadLimit = intent.getLongExtra(EXTRA_DOWNLOAD_LIMIT, 0L)
@@ -398,7 +393,6 @@ class MyVpnService : VpnService() {
                     if (effectiveUpdateConfigs.isNotEmpty()) {
                         vpnWorker?.updateAppSpeedConfigs(effectiveUpdateConfigs)
                     }
-                    socksServer?.setRates(downloadLimit, uploadLimit)
                     NetworkMonitorService.instance?.updateNotification()
                 }
             }
@@ -625,11 +619,6 @@ class MyVpnService : VpnService() {
             vpnWorker?.stop()
         } catch (e: Exception) {
             Log.w(TAG, "Error stopping vpnWorker: ${e.message}")
-        }
-        try {
-            socksServer?.stop()
-        } catch (e: Exception) {
-            Log.w(TAG, "Error stopping socksServer: ${e.message}")
         }
 
         // 2. Close TUN descriptor
