@@ -4,7 +4,10 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
+[![Release](https://img.shields.io/badge/Download_APK-v1.0.0-success?style=for-the-badge&logo=android)](https://github.com/AzamAhmed77/Net-Guard/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/License-All_Rights_Reserved-red?style=for-the-badge)](LICENSE)
+
+> 📥 **[اضغط هنا لتحميل أحدث نسخة جاهزة للتثبيت فوراً (NetGuard v1.0.0 APK)](https://github.com/AzamAhmed77/Net-Guard/raw/main/NetGuard_Release.apk)** 🚀
 
 ---
 
