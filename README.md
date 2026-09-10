@@ -4,7 +4,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-All_Rights_Reserved-red?style=for-the-badge)](LICENSE)
 
 ---
 
@@ -142,6 +142,7 @@
 
 ---
 
-## 📄 الترخيص | License
+## 📄 حقوق الملكية والترخيص | License & Copyright
 
-هذا المشروع مرخص تحت رخصة **MIT License** — راجع ملف [LICENSE](LICENSE) لمزيد من التفاصيل.
+**جميع الحقوق محفوظة © 2026 — All Rights Reserved.**  
+هذا التطبيق محمي بموجب قوانين الملكية الفكرية وحقوق النشر والتأليف. لا يُسمح بإعادة توزيع أو بيع أو استخدام الكود المصدري لأي أغراض تجارية دون إذن كتابي مسبق من المطور.
