@@ -9,11 +9,15 @@ class VpnConfig {
   bool ebpfEnabled;
   bool dpiEnabled;
 
-  // DNS Filters
+  // DNS Filters & DoH (DNS-over-HTTPS)
   bool blockAds;
   bool blockAdult;
   bool blockSocial;
   bool dnsRebindingProtection;
+  bool dohEnabled;
+  String dohProvider; // 'cloudflare', 'adguard', 'google', 'custom'
+  String customDohUrl;
+  bool ipv6LeakProtection;
   String selectedDnsProvider; // 'Cloudflare', 'Google', 'Quad9', 'AdGuard', 'Custom'
   String customDnsPrimary;
   String customDnsSecondary;
@@ -77,6 +81,10 @@ class VpnConfig {
     this.blockAdult = true,
     this.blockSocial = false,
     this.dnsRebindingProtection = true,
+    this.dohEnabled = false,
+    this.dohProvider = 'cloudflare',
+    this.customDohUrl = '',
+    this.ipv6LeakProtection = true,
     this.selectedDnsProvider = 'Cloudflare',
     this.customDnsPrimary = '1.1.1.1',
     this.customDnsSecondary = '1.0.0.1',
@@ -102,6 +110,20 @@ class VpnConfig {
   })  : blockedDomains = blockedDomains ?? ['doubleclick.net', 'analytics.google.com', 'tracking.ad-server.com'],
         customFilterLists = customFilterLists ?? ['https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt'];
 
+  String get effectiveDohUrl {
+    switch (dohProvider.toLowerCase()) {
+      case 'adguard':
+        return 'https://dns.adguard-dns.com/dns-query';
+      case 'google':
+        return 'https://dns.google/dns-query';
+      case 'custom':
+        return customDohUrl.isNotEmpty ? customDohUrl : 'https://cloudflare-dns.com/dns-query';
+      case 'cloudflare':
+      default:
+        return 'https://cloudflare-dns.com/dns-query';
+    }
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'isVpnActive': isVpnActive,
@@ -115,6 +137,10 @@ class VpnConfig {
       'blockAdult': blockAdult,
       'blockSocial': blockSocial,
       'dnsRebindingProtection': dnsRebindingProtection,
+      'dohEnabled': dohEnabled,
+      'dohProvider': dohProvider,
+      'customDohUrl': customDohUrl,
+      'ipv6LeakProtection': ipv6LeakProtection,
       'selectedDnsProvider': selectedDnsProvider,
       'customDnsPrimary': customDnsPrimary,
       'customDnsSecondary': customDnsSecondary,
@@ -155,6 +181,10 @@ class VpnConfig {
       blockAdult: json['blockAdult'] ?? true,
       blockSocial: json['blockSocial'] ?? false,
       dnsRebindingProtection: json['dnsRebindingProtection'] ?? true,
+      dohEnabled: json['dohEnabled'] ?? false,
+      dohProvider: json['dohProvider'] ?? 'cloudflare',
+      customDohUrl: json['customDohUrl'] ?? '',
+      ipv6LeakProtection: json['ipv6LeakProtection'] ?? true,
       selectedDnsProvider: json['selectedDnsProvider'] ?? 'Cloudflare',
       customDnsPrimary: json['customDnsPrimary'] ?? '1.1.1.1',
       customDnsSecondary: json['customDnsSecondary'] ?? '1.0.0.1',

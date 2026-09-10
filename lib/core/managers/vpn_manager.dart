@@ -1157,6 +1157,9 @@ class VpnManager extends ChangeNotifier {
           ebpfEnabled: config.ebpfEnabled,
           dpiEnabled: config.dpiEnabled,
           dnsRebindingProtection: config.dnsRebindingProtection,
+          dohEnabled: config.dohEnabled,
+          dohUrl: config.effectiveDohUrl,
+          ipv6LeakProtection: config.ipv6LeakProtection,
         );
 
         if (started) {
@@ -1284,7 +1287,34 @@ class VpnManager extends ChangeNotifier {
       ebpfEnabled: config.ebpfEnabled,
       dpiEnabled: config.dpiEnabled,
       dnsRebindingProtection: config.dnsRebindingProtection,
+      dohEnabled: config.dohEnabled,
+      dohUrl: config.effectiveDohUrl,
+      ipv6LeakProtection: config.ipv6LeakProtection,
     );
+  }
+
+  void setDohEnabled(bool val) {
+    config.dohEnabled = val;
+    syncNativeSettings();
+    notifyListeners();
+  }
+
+  void setDohProvider(String provider) {
+    config.dohProvider = provider;
+    syncNativeSettings();
+    notifyListeners();
+  }
+
+  void setCustomDohUrl(String url) {
+    config.customDohUrl = url.trim();
+    syncNativeSettings();
+    notifyListeners();
+  }
+
+  void setIpv6LeakProtection(bool val) {
+    config.ipv6LeakProtection = val;
+    syncNativeSettings();
+    notifyListeners();
   }
 
   List<String> _resolveActiveDnsServers() {

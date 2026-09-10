@@ -468,7 +468,69 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 20),
 
           // ==========================================
-          // 5. ENCRYPTED DNS PROVIDER
+          // 5. ENCRYPTED DNS (DoH) & IPV6 PROTECTION
+          // ==========================================
+          _buildSectionHeader(strings.dohSectionTitle),
+          _buildCard(
+            children: [
+              _buildSwitchTile(
+                icon: Icons.lock_outline_rounded,
+                title: strings.dohTitle,
+                subtitle: strings.dohDesc,
+                value: vpn.config.dohEnabled,
+                onChanged: (val) => vpn.setDohEnabled(val),
+              ),
+              if (vpn.config.dohEnabled) ...[
+                const Divider(color: AppColors.borderDark, height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        strings.dohProviderLabel,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDohChip('Cloudflare', vpn.config.dohProvider == 'cloudflare', () {
+                              vpn.setDohProvider('cloudflare');
+                            }),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildDohChip('AdGuard', vpn.config.dohProvider == 'adguard', () {
+                              vpn.setDohProvider('adguard');
+                            }),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildDohChip('Google', vpn.config.dohProvider == 'google', () {
+                              vpn.setDohProvider('google');
+                            }),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const Divider(color: AppColors.borderDark, height: 1),
+              _buildSwitchTile(
+                icon: Icons.security_rounded,
+                title: strings.ipv6ProtectionTitle,
+                subtitle: strings.ipv6ProtectionDesc,
+                value: vpn.config.ipv6LeakProtection,
+                onChanged: (val) => vpn.setIpv6LeakProtection(val),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // ==========================================
+          // 5.1 STANDARD DNS RESOLVER
           // ==========================================
           _buildSectionHeader(strings.dnsProviderTitle),
           _buildCard(
@@ -811,6 +873,30 @@ class SettingsScreen extends StatelessWidget {
               size: 20,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDohChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accent : AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isSelected ? AppColors.accent : AppColors.borderDark),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+          ),
         ),
       ),
     );

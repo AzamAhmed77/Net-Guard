@@ -356,5 +356,23 @@ class AppStrings {
   String get usageChartTitle => isAr ? 'توزيع استهلاك الباقة' : 'Data Usage Breakdown';
   String get otherApps => isAr ? 'تطبيقات أخرى' : 'Other Apps';
   String get totalUsageCenter => isAr ? 'الإجمالي' : 'Total';
+
+  // ── Encrypted DNS (DoH) & IPv6 Leak Protection ──
+  String get dohSectionTitle => isAr ? 'نظام DNS المشفر الحديث (DoH)' : 'ENCRYPTED DNS (DNS-OVER-HTTPS)';
+  String get dohTitle => isAr ? 'تشفير DNS عبر HTTPS (DoH)' : 'DNS-over-HTTPS (DoH)';
+  String get dohDesc => isAr
+      ? 'تشفير استعلامات DNS بتقنية HTTPS لمنع مزودي الخدمة من التجسس أو التلاعب'
+      : 'Encrypt all DNS queries over HTTPS to prevent ISP surveillance and hijacking';
+  String get dohProviderLabel => isAr ? 'مزود DoH المشفر' : 'DoH Provider';
+  String get dohCloudflare => 'Cloudflare DoH (1.1.1.1)';
+  String get dohGoogle => 'Google DoH (8.8.8.8)';
+  String get dohAdguard => isAr ? 'AdGuard DoH (تشفير + حجب إعلانات)' : 'AdGuard DoH (Encrypted + AdBlock)';
+  String get dohCustom => isAr ? 'رابط DoH مخصص' : 'Custom DoH URL';
+  String get customDohUrlHint => 'https://example.com/dns-query';
+
+  String get ipv6ProtectionTitle => isAr ? 'درع حماية تسريب IPv6' : 'IPv6 Leak Protection';
+  String get ipv6ProtectionDesc => isAr
+      ? 'احتجاز كامل حركة IPv6 داخل النفق ومنع تجاوز جدار الحماية والسرعة'
+      : 'Route and filter all IPv6 through the tunnel to prevent bypass and leaks';
 }
 

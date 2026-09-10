@@ -31,6 +31,9 @@ class MethodChannelService {
     bool ebpfEnabled = true,
     bool dpiEnabled = true,
     bool dnsRebindingProtection = true,
+    bool dohEnabled = false,
+    String dohUrl = '',
+    bool ipv6LeakProtection = true,
   }) async {
     try {
       final bool success = await _channel.invokeMethod('startVpn', {
@@ -58,6 +61,9 @@ class MethodChannelService {
         'ebpfEnabled': ebpfEnabled,
         'dpiEnabled': dpiEnabled,
         'dnsRebindingProtection': dnsRebindingProtection,
+        'dohEnabled': dohEnabled,
+        'dohUrl': dohUrl,
+        'ipv6LeakProtection': ipv6LeakProtection,
       });
       return success;
     } on PlatformException catch (e) {
@@ -175,6 +181,9 @@ class MethodChannelService {
     bool ebpfEnabled = true,
     bool dpiEnabled = true,
     bool dnsRebindingProtection = true,
+    bool dohEnabled = false,
+    String dohUrl = '',
+    bool ipv6LeakProtection = true,
   }) async {
     try {
       await _channel.invokeMethod('updateSettings', {
@@ -202,6 +211,9 @@ class MethodChannelService {
         'ebpfEnabled': ebpfEnabled,
         'dpiEnabled': dpiEnabled,
         'dnsRebindingProtection': dnsRebindingProtection,
+        'dohEnabled': dohEnabled,
+        'dohUrl': dohUrl,
+        'ipv6LeakProtection': ipv6LeakProtection,
       });
     } on PlatformException catch (e) {
       debugPrint("Failed to update settings: '${e.message}'.");

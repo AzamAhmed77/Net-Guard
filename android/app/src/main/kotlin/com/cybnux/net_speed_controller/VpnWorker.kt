@@ -7,8 +7,10 @@ import android.util.Log
 import java.io.FileDescriptor
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
@@ -16,6 +18,7 @@ import java.nio.channels.Selector
 import java.nio.channels.SocketChannel
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Executors
 import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -156,6 +159,12 @@ class VpnWorker(private val vpnService: VpnService) {
     @Volatile private var dpiEnabled: Boolean = true
     @Volatile private var dnsRebindingProtection: Boolean = true
 
+    // ── Encrypted DNS (DoH) & IPv6 Leak Protection ──
+    @Volatile private var dohEnabled: Boolean = false
+    @Volatile private var dohUrl: String = "https://cloudflare-dns.com/dns-query"
+    @Volatile private var ipv6Protection: Boolean = true
+    private val dohExecutor = Executors.newFixedThreadPool(4)
+
     // Direct buffer recycling pool for eBPF Zero-Copy packet fast-path
     private val bufferPool = ConcurrentLinkedQueue<ByteArray>()
     private fun obtainPacketBuffer(): ByteArray {
@@ -230,6 +239,7 @@ class VpnWorker(private val vpnService: VpnService) {
         udpTable.clear(); tcpTable.clear()
         uidPackageCache.clear()
         toDeviceQueue.clear()
+        try { dohExecutor.shutdownNow() } catch (_: Exception) {}
 
         Log.i(TAG, "Stopped VpnWorker")
     }
@@ -313,7 +323,8 @@ class VpnWorker(private val vpnService: VpnService) {
         dnsCustom: List<String>,
         capBytes: Long, capAction: String,
         schedOn: Boolean, sStartH: Int, sStartM: Int, sEndH: Int, sEndM: Int,
-        ebpfOn: Boolean = true, dpiOn: Boolean = true, dnsRebindingOn: Boolean = true
+        ebpfOn: Boolean = true, dpiOn: Boolean = true, dnsRebindingOn: Boolean = true,
+        dohOn: Boolean = false, dohEndpoint: String = "", ipv6Shield: Boolean = true
     ) {
         setRates(dlLimit, ulLimit)
         allowedApps = allowed.toSet()
@@ -335,6 +346,11 @@ class VpnWorker(private val vpnService: VpnService) {
         ebpfEnabled = ebpfOn
         dpiEnabled = dpiOn
         dnsRebindingProtection = dnsRebindingOn
+        dohEnabled = dohOn
+        if (dohEndpoint.isNotBlank()) {
+            dohUrl = dohEndpoint
+        }
+        ipv6Protection = ipv6Shield
         isDataCapExceeded = false
         uidPackageCache.clear()
 
@@ -863,6 +879,12 @@ class VpnWorker(private val vpnService: VpnService) {
         val sA = if (isV6) pkt.sliceArray(8..23) else pkt.sliceArray(12..15)
         val dA = if (isV6) pkt.sliceArray(24..39) else pkt.sliceArray(16..19)
         if (isLocalOrTetherOrBroadcast(dA, isV6) || isLocalOrTetherOrBroadcast(sA, isV6)) return
+
+        // IPv6 Leak Protection: If active and physical network lacks native global IPv6, absorb packet
+        if (isV6 && ipv6Protection && (vpnService as? MyVpnService)?.hasGlobalIpv6() != true) {
+            return
+        }
+
         val sP = u16(pkt, ihl)
         val dP = u16(pkt, ihl + 2)
         val key = "${sA.hex()}:$sP>${dA.hex()}:$dP"
@@ -881,6 +903,25 @@ class VpnWorker(private val vpnService: VpnService) {
                     queueDownloadPacket(buildUdp(dA, sA, dP, sP, dnsResp))
                     return
                 }
+            }
+
+            // IPv6 Leak Protection: If active and network lacks native IPv6, synthesize immediate empty response for AAAA queries
+            if (ipv6Protection && isAaaaQuery(dnsQuery) && (vpnService as? MyVpnService)?.hasGlobalIpv6() != true) {
+                val emptyResp = buildEmptyDnsResponse(dnsQuery)
+                if (emptyResp != null) {
+                    queueDownloadPacket(buildUdp(dA, sA, dP, sP, emptyResp))
+                    return
+                }
+            }
+
+            // Encrypted DNS (DoH) via HTTPS
+            if (dohEnabled && dohUrl.isNotBlank()) {
+                queryDoh(dnsQuery) { respBytes ->
+                    if (respBytes != null && running.get()) {
+                        queueDownloadPacket(buildUdp(dA, sA, dP, sP, respBytes))
+                    }
+                }
+                return
             }
         }
 
@@ -1000,6 +1041,12 @@ class VpnWorker(private val vpnService: VpnService) {
         val sA = if (isV6) pkt.sliceArray(8..23) else pkt.sliceArray(12..15)
         val dA = if (isV6) pkt.sliceArray(24..39) else pkt.sliceArray(16..19)
         if (isLocalOrTetherOrBroadcast(dA, isV6) || isLocalOrTetherOrBroadcast(sA, isV6)) return
+
+        // IPv6 Leak Protection: If active and physical network lacks native global IPv6, absorb packet
+        if (isV6 && ipv6Protection && (vpnService as? MyVpnService)?.hasGlobalIpv6() != true) {
+            return
+        }
+
         val sP = u16(pkt, ihl)
         val dP = u16(pkt, ihl + 2)
         val seq = u32(pkt, ihl + 4)
@@ -1784,6 +1831,81 @@ class VpnWorker(private val vpnService: VpnService) {
         resp[o + 12] = ipAddress[0]; resp[o + 13] = ipAddress[1]; resp[o + 14] = ipAddress[2]; resp[o + 15] = ipAddress[3]
         
         return resp
+    }
+
+    private fun isAaaaQuery(dnsReq: ByteArray): Boolean {
+        if (dnsReq.size < 16) return false
+        var i = 12
+        while (i < dnsReq.size) {
+            val len = dnsReq[i].toInt() and 0xFF
+            if (len == 0) {
+                val qtypeOffset = i + 1
+                if (qtypeOffset + 2 <= dnsReq.size) {
+                    val qtype = ((dnsReq[qtypeOffset].toInt() and 0xFF) shl 8) or (dnsReq[qtypeOffset + 1].toInt() and 0xFF)
+                    return qtype == 28 // Type 28 = AAAA (IPv6 address query)
+                }
+                break
+            }
+            if (len > 63) return false
+            i += 1 + len
+        }
+        return false
+    }
+
+    private fun buildEmptyDnsResponse(dnsReq: ByteArray): ByteArray? {
+        if (dnsReq.size < 12) return null
+        var i = 12
+        while (i < dnsReq.size) {
+            val len = dnsReq[i].toInt() and 0xFF
+            if (len == 0) break
+            if (len > 63) return null
+            i += 1 + len
+        }
+        val qLen = i + 1 + 4
+        if (qLen > dnsReq.size) return null
+        val resp = ByteArray(qLen)
+        resp[0] = dnsReq[0]; resp[1] = dnsReq[1]
+        resp[2] = 0x81.toByte(); resp[3] = 0x80.toByte() // Standard query response, No error
+        resp[4] = 0x00.toByte(); resp[5] = 0x01.toByte() // QDCOUNT = 1
+        resp[6] = 0x00.toByte(); resp[7] = 0x00.toByte() // ANCOUNT = 0 (No answer records)
+        resp[8] = 0x00.toByte(); resp[9] = 0x00.toByte()
+        resp[10] = 0x00.toByte(); resp[11] = 0x00.toByte()
+        System.arraycopy(dnsReq, 12, resp, 12, qLen - 12)
+        return resp
+    }
+
+    private fun queryDoh(dnsQuery: ByteArray, onResponse: (ByteArray?) -> Unit) {
+        dohExecutor.execute {
+            var conn: HttpURLConnection? = null
+            try {
+                val endpoint = if (dohUrl.isNotBlank()) dohUrl else "https://cloudflare-dns.com/dns-query"
+                val url = URL(endpoint)
+                conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.connectTimeout = 3000
+                conn.readTimeout = 3000
+                conn.doOutput = true
+                conn.doInput = true
+                conn.useCaches = false
+                conn.setRequestProperty("Content-Type", "application/dns-message")
+                conn.setRequestProperty("Accept", "application/dns-message")
+                conn.outputStream.use { out ->
+                    out.write(dnsQuery)
+                    out.flush()
+                }
+                if (conn.responseCode == 200) {
+                    val respBytes = conn.inputStream.use { it.readBytes() }
+                    onResponse(respBytes)
+                } else {
+                    onResponse(null)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "DoH query failed: ${e.message}")
+                onResponse(null)
+            } finally {
+                try { conn?.disconnect() } catch (_: Exception) {}
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════

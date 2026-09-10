@@ -92,6 +92,20 @@ class _ExpertSettingsModalState extends State<ExpertSettingsModal> {
                       : "${val ? 'Enabled' : 'Disabled'} DNS Rebinding Protection.");
                 },
               ),
+
+              const Divider(color: AppColors.borderDark, height: 20),
+
+              _buildOptionRow(
+                title: strings.ipv6ProtectionTitle,
+                subtitle: strings.ipv6ProtectionDesc,
+                value: manager.config.ipv6LeakProtection,
+                onChanged: (val) {
+                  setState(() => manager.setIpv6LeakProtection(val));
+                  manager.addLog("INFO", manager.isArabic
+                      ? "تم ${val ? 'تفعيل' : 'إيقاف'} درع حماية تسريب IPv6."
+                      : "${val ? 'Enabled' : 'Disabled'} IPv6 Leak Protection.");
+                },
+              ),
             ],
           ),
         ),

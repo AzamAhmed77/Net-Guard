@@ -64,6 +64,9 @@ class MyVpnService : VpnService() {
         const val EXTRA_EBPF_ENABLED = "ebpf_enabled"
         const val EXTRA_DPI_ENABLED = "dpi_enabled"
         const val EXTRA_DNS_REBINDING = "dns_rebinding"
+        const val EXTRA_DOH_ENABLED = "doh_enabled"
+        const val EXTRA_DOH_URL = "doh_url"
+        const val EXTRA_IPV6_PROTECTION = "ipv6_protection"
 
         @Volatile var totalRxBytes: Long = 0
         @Volatile var totalTxBytes: Long = 0
@@ -104,7 +107,10 @@ class MyVpnService : VpnService() {
             lockdownScreenOff: Boolean = false,
             ebpfEnabled: Boolean = true,
             dpiEnabled: Boolean = true,
-            dnsRebindingProtection: Boolean = true
+            dnsRebindingProtection: Boolean = true,
+            dohEnabled: Boolean = false,
+            dohUrl: String = "",
+            ipv6Protection: Boolean = true
         ) {
             try {
                 val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
@@ -114,6 +120,9 @@ class MyVpnService : VpnService() {
                     putBoolean("ebpf_enabled", ebpfEnabled)
                     putBoolean("dpi_enabled", dpiEnabled)
                     putBoolean("dns_rebinding_protection", dnsRebindingProtection)
+                    putBoolean("doh_enabled", dohEnabled)
+                    putString("doh_url", dohUrl)
+                    putBoolean("ipv6_protection", ipv6Protection)
                     putLong("download_limit", downloadLimit)
                     putLong("upload_limit", uploadLimit)
                     putStringSet("allowed_apps", allowedApps.toSet())
@@ -178,6 +187,9 @@ class MyVpnService : VpnService() {
                 val ebpfEnabled = prefs.getBoolean("ebpf_enabled", true)
                 val dpiEnabled = prefs.getBoolean("dpi_enabled", true)
                 val dnsRebindingProtection = prefs.getBoolean("dns_rebinding_protection", true)
+                val dohEnabled = prefs.getBoolean("doh_enabled", false)
+                val dohUrl = prefs.getString("doh_url", "") ?: ""
+                val ipv6Protection = prefs.getBoolean("ipv6_protection", true)
 
                 Intent(context, MyVpnService::class.java).apply {
                     action = ACTION_START
@@ -205,6 +217,9 @@ class MyVpnService : VpnService() {
                     putExtra(EXTRA_EBPF_ENABLED, ebpfEnabled)
                     putExtra(EXTRA_DPI_ENABLED, dpiEnabled)
                     putExtra(EXTRA_DNS_REBINDING, dnsRebindingProtection)
+                    putExtra(EXTRA_DOH_ENABLED, dohEnabled)
+                    putExtra(EXTRA_DOH_URL, dohUrl)
+                    putExtra(EXTRA_IPV6_PROTECTION, ipv6Protection)
                 }
             } catch (e: Exception) {
                 Log.e("MyVpnService", "Failed to build start intent from prefs: ${e.message}")
@@ -316,6 +331,9 @@ class MyVpnService : VpnService() {
                     val ebpfEnabled = intent.getBooleanExtra(EXTRA_EBPF_ENABLED, true)
                     val dpiEnabled = intent.getBooleanExtra(EXTRA_DPI_ENABLED, true)
                     val dnsRebindingProtection = intent.getBooleanExtra(EXTRA_DNS_REBINDING, true)
+                    val dohEnabled = intent.getBooleanExtra(EXTRA_DOH_ENABLED, false)
+                    val dohUrl = intent.getStringExtra(EXTRA_DOH_URL) ?: ""
+                    val ipv6Protection = intent.getBooleanExtra(EXTRA_IPV6_PROTECTION, true)
                     currentConfiguredDownloadLimit = downloadLimit
                     currentConfiguredUploadLimit = uploadLimit
 
@@ -325,7 +343,8 @@ class MyVpnService : VpnService() {
                         dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked, dnsServers,
                         dataCapBytes, dataCapAction,
                         schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
-                        ebpfEnabled, dpiEnabled, dnsRebindingProtection
+                        ebpfEnabled, dpiEnabled, dnsRebindingProtection,
+                        dohEnabled, dohUrl, ipv6Protection
                     )
                     val effectiveAppSpeedConfigs = if (appSpeedConfigs.isNotEmpty()) {
                         appSpeedConfigs
@@ -356,6 +375,9 @@ class MyVpnService : VpnService() {
                     val ebpfEnabled = intent.getBooleanExtra(EXTRA_EBPF_ENABLED, true)
                     val dpiEnabled = intent.getBooleanExtra(EXTRA_DPI_ENABLED, true)
                     val dnsRebindingProtection = intent.getBooleanExtra(EXTRA_DNS_REBINDING, true)
+                    val dohEnabled = intent.getBooleanExtra(EXTRA_DOH_ENABLED, false)
+                    val dohUrl = intent.getStringExtra(EXTRA_DOH_URL) ?: ""
+                    val ipv6Protection = intent.getBooleanExtra(EXTRA_IPV6_PROTECTION, true)
                     currentConfiguredDownloadLimit = downloadLimit
                     currentConfiguredUploadLimit = uploadLimit
                     val allowedApps = intent.getStringArrayListExtra(EXTRA_ALLOWED_APPS) ?: emptyList<String>()
@@ -382,7 +404,8 @@ class MyVpnService : VpnService() {
                         dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked,
                         dataCapBytes, dataCapAction,
                         schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
-                        ebpfEnabled, dpiEnabled, dnsRebindingProtection
+                        ebpfEnabled, dpiEnabled, dnsRebindingProtection,
+                        dohEnabled, dohUrl, ipv6Protection
                     )
                     val effectiveUpdateConfigs = if (appSpeedConfigs.isNotEmpty()) {
                         appSpeedConfigs
@@ -424,7 +447,10 @@ class MyVpnService : VpnService() {
         schedEnabled: Boolean, schedStartH: Int, schedStartM: Int, schedEndH: Int, schedEndM: Int,
         ebpfEnabled: Boolean = true,
         dpiEnabled: Boolean = true,
-        dnsRebindingProtection: Boolean = true
+        dnsRebindingProtection: Boolean = true,
+        dohEnabled: Boolean = false,
+        dohUrl: String = "",
+        ipv6Protection: Boolean = true
     ) {
         if (isRunning && vpnInterface != null) {
             Log.i(TAG, "VPN is already running; updating the existing worker")
@@ -434,7 +460,8 @@ class MyVpnService : VpnService() {
                 dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked,
                 dataCapBytes, dataCapAction,
                 schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
-                ebpfEnabled, dpiEnabled, dnsRebindingProtection
+                ebpfEnabled, dpiEnabled, dnsRebindingProtection,
+                dohEnabled, dohUrl, ipv6Protection
             )
             return
         }
@@ -463,21 +490,20 @@ class MyVpnService : VpnService() {
             builder.addAddress("10.0.0.1", 24)
             builder.addRoute("0.0.0.0", 0) // Route all IPv4 traffic
             
-            // IPv6 config: only enable if the underlying physical network actually supports global IPv6.
-            // On IPv4-only networks (most mobile data carriers), routing ::/0 creates a blackhole
-            // causing apps to hang, retry endlessly, and waste cellular quota.
-            if (hasGlobalIpv6()) {
+            // IPv6 config: route ::/0 when IPv6 leak protection is enabled or when network has global IPv6.
+            // When IPv6 leak protection is on, VpnWorker absorbs/intercepts IPv6 and responds with NODATA to DNS AAAA
+            // queries so apps cleanly fall back to IPv4 without hanging or leaking outside the VPN tunnel.
+            if (ipv6Protection || hasGlobalIpv6()) {
                 try {
                     builder.addAddress("fd00::1", 128)
                     builder.addRoute("::", 0)
-                    Log.i(TAG, "Native IPv6 supported on network; IPv6 route enabled")
+                    Log.i(TAG, "IPv6 route ::/0 enabled (leakProtection=$ipv6Protection, globalIpv6=${hasGlobalIpv6()})")
                 } catch (e: Exception) {
                     Log.w(TAG, "IPv6 route setup ignored: ${e.message}")
                 }
             } else {
-                Log.i(TAG, "No native IPv6 on network; IPv6 route omitted to prevent connection retry loops")
+                Log.i(TAG, "No native IPv6 on network and leak protection disabled; IPv6 route omitted")
             }
-            
             
             if (dnsServers.isNotEmpty()) {
                 for (dns in dnsServers) {
@@ -528,7 +554,8 @@ class MyVpnService : VpnService() {
                 dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked,
                 dataCapBytes, dataCapAction,
                 schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
-                ebpfEnabled, dpiEnabled, dnsRebindingProtection
+                ebpfEnabled, dpiEnabled, dnsRebindingProtection,
+                dohEnabled, dohUrl, ipv6Protection
             )
             val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
             val savedAppSpeedConfigs = prefs.getString("app_speed_configs", "") ?: ""
@@ -589,7 +616,7 @@ class MyVpnService : VpnService() {
         return vpnWorker?.getPerAppUsageMap() ?: emptyMap()
     }
 
-    private fun hasGlobalIpv6(): Boolean {
+    fun hasGlobalIpv6(): Boolean {
         return try {
             val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
