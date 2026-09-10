@@ -43,7 +43,7 @@
 
 ### 6. التواصل والدعم
 إذا كانت لديك أي استفسارات أو أسئلة حول سياسة الخصوصية، يمكنك التواصل معنا عبر:
-- **البريد الإلكتروني للدعم:** support@cybnux.com
+- **البريد الإلكتروني للدعم:** AzamAhemdAli2@gmail.com
 - **الموقع / المستودع:** https://github.com/AzamAhmed77/Net-Guard
 
 ---
@@ -83,5 +83,5 @@ Net Guard queries Android’s `NetworkStatsManager` API to display live and dail
 
 ### 4. Contact Us
 For any inquiries regarding this policy, please reach out at:
-- **Support Email:** support@cybnux.com
+- **Support Email:** AzamAhemdAli2@gmail.com
 - **GitHub Repository:** https://github.com/AzamAhmed77/Net-Guard
