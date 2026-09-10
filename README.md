@@ -144,5 +144,10 @@
 
 ## 📄 حقوق الملكية والترخيص | License & Copyright
 
-**جميع الحقوق محفوظة © 2026 — All Rights Reserved.**  
-هذا التطبيق محمي بموجب قوانين الملكية الفكرية وحقوق النشر والتأليف. لا يُسمح بإعادة توزيع أو بيع أو استخدام الكود المصدري لأي أغراض تجارية دون إذن كتابي مسبق من المطور.
+### 🇸🇦 بالعربية:
+**جميع الحقوق محفوظة © 2026 تطبيق Net Guard (حارس الإنترنت).**  
+هذا التطبيق وكوده المصدري محمي بموجب قوانين الملكية الفكرية وحقوق النشر والتأليف. يُحظر تماماً نسخ أو توزيع أو تعديل أو إعادة بيع الكود لأي أغراض تجارية دون إذن كتابي وصريح مسبق من المطور. راجع ملف [LICENSE](LICENSE) للتفاصيل الكاملة.
+
+### 🇬🇧 In English:
+**Copyright © 2026 Net Guard. All Rights Reserved.**  
+This software and its source code are protected by intellectual property and copyright laws. Unauthorized copying, distribution, modification, or commercial use of this project without prior written permission from the copyright owner is strictly prohibited. See [LICENSE](LICENSE) for full legal terms.
