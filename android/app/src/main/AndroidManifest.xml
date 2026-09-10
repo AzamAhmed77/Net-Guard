@@ -15,6 +15,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
 
     <application
@@ -77,12 +78,22 @@
             </intent-filter>
         </receiver>
 
+        <!-- Receiver for Notification Quick Toggle Action -->
+        <receiver
+            android:name=".VpnActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.cybnux.netspeed.TOGGLE_VPN" />
+            </intent-filter>
+        </receiver>
+
         <!-- Package Receiver for Auto-Quarantine of new apps -->
         <receiver
             android:name=".PackageReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>

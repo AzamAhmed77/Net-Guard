@@ -281,4 +281,25 @@ class AppStrings {
   String get dpiDesc => isAr ? 'تحليل أنواع حركة المرور وتطبيق قواعد جودة الخدمة QoS' : 'Analyze traffic protocols and apply QoS rules';
   String get dnsRebindingTitle => isAr ? 'حماية DNS Rebinding Protection' : 'DNS Rebinding Protection';
   String get dnsRebindingDesc => isAr ? 'منع البرمجيات الخبيثة من استغلال الشبكات المحلية' : 'Prevent malicious scripts from attacking local networks';
+
+  // ── Hotspot Speed Controller ──
+  String get hotspotSectionTitle => isAr ? 'بث نقطة الاتصال (Hotspot)' : 'Hotspot Tethering';
+  String get hotspotControllerTitle => isAr ? 'متحكم سرعة بث نقطة الاتصال' : 'Hotspot Speed Controller';
+  String get hotspotControllerDesc => isAr
+      ? 'تقييد سرعة الأجهزة المتصلة ببث هاتفك ومراقبة استهلاكها اللحظي'
+      : 'Throttle tethered devices speed and monitor live hotspot data usage';
+  String get hotspotStatusActive => isAr ? 'متحكم البث قيد التشغيل 🟢' : 'Hotspot Controller Active 🟢';
+  String get hotspotStatusStopped => isAr ? 'متحكم البث متوقف ⚪' : 'Hotspot Controller Stopped ⚪';
+  String get hotspotProxySettings => isAr ? 'بيانات البروكسي للأجهزة المتصلة' : 'Proxy Settings for Connected Devices';
+  String get hotspotIpLabel => isAr ? 'عنوان IP (المضيف):' : 'Host IP:';
+  String get hotspotPortLabel => isAr ? 'المنفذ (Port):' : 'Port:';
+  String get hotspotSpeedLimits => isAr ? 'تحديد السرعة للأجهزة المتصلة' : 'Tethered Speed Limits';
+  String get hotspotConnectedClients => isAr ? 'الأجهزة المتصلة حالياً:' : 'Active Connected Devices:';
+  String get hotspotDataConsumed => isAr ? 'بيانات البث المستهلكة:' : 'Hotspot Data Consumed:';
+  String get hotspotSetupGuide => isAr ? 'طريقة ربط الأجهزة بالبث المقيد' : 'Quick Setup Guide';
+  String get hotspotSetupAndroid => isAr ? 'أندرويد (Android)' : 'Android';
+  String get hotspotSetupIos => isAr ? 'آيفون / آيباد (iOS)' : 'iPhone / iPad';
+  String get hotspotSetupPc => isAr ? 'كمبيوتر (Windows / Mac)' : 'PC (Windows / Mac)';
+  String get hotspotCopySuccess => isAr ? 'تم نسخ بيانات الاتصال إلى الحافظة' : 'Connection details copied to clipboard';
 }
+

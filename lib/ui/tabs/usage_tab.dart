@@ -554,7 +554,36 @@ class _UsageTabState extends State<UsageTab> {
   Widget build(BuildContext context) {
     final vpn = Provider.of<VpnManager>(context);
     final strings = AppStrings(vpn.isArabic);
-    final allApps = vpn.apps;
+
+    // Merge installed apps with tethering and uninstalled apps detected in network usage
+    final List<AppInfo> allApps = List<AppInfo>.from(vpn.apps);
+    final existingPkgs = allApps.map((a) => a.packageName).toSet();
+    final allTrafficPkgs = {..._wifiTraffic.keys, ..._mobileTraffic.keys};
+
+    for (final pkg in allTrafficPkgs) {
+      if (!existingPkgs.contains(pkg)) {
+        if (pkg == 'com.cybnux.tethering_hotspot') {
+          allApps.add(AppInfo(
+            name: vpn.isArabic ? 'نقطة اتصال الهواتف (بث)' : 'Tethering & Hotspot',
+            packageName: pkg,
+            isSystem: true,
+          ));
+        } else if (pkg == 'com.cybnux.uninstalled_apps') {
+          allApps.add(AppInfo(
+            name: vpn.isArabic ? 'تطبيقات محذوفة' : 'Uninstalled Applications',
+            packageName: pkg,
+            isSystem: false,
+          ));
+        } else {
+          allApps.add(AppInfo(
+            name: pkg,
+            packageName: pkg,
+            isSystem: false,
+          ));
+        }
+        existingPkgs.add(pkg);
+      }
+    }
 
     // Build usage list sorted by usage
     final List<MapEntry<AppInfo, double>> usageList = allApps
@@ -775,19 +804,27 @@ class _UsageTabState extends State<UsageTab> {
                                   width: 36,
                                   height: 36,
                                   decoration: BoxDecoration(
-                                    color: AppColors.surfaceHover,
+                                    color: app.packageName == 'com.cybnux.tethering_hotspot'
+                                        ? const Color(0xFFF59E0B).withValues(alpha: 0.18)
+                                        : app.packageName == 'com.cybnux.uninstalled_apps'
+                                            ? const Color(0xFFEF4444).withValues(alpha: 0.18)
+                                            : AppColors.surfaceHover,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(10),
-                                    child: app.iconBytes != null
-                                        ? Image.memory(
-                                            app.iconBytes!,
-                                            width: 36,
-                                            height: 36,
-                                            fit: BoxFit.cover,
-                                          )
-                                        : const Icon(Icons.android, color: AppColors.textSecondary, size: 20),
+                                    child: app.packageName == 'com.cybnux.tethering_hotspot'
+                                        ? const Icon(Icons.wifi_tethering_rounded, color: Color(0xFFF59E0B), size: 20)
+                                        : app.packageName == 'com.cybnux.uninstalled_apps'
+                                            ? const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)
+                                            : app.iconBytes != null
+                                                ? Image.memory(
+                                                    app.iconBytes!,
+                                                    width: 36,
+                                                    height: 36,
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : const Icon(Icons.android, color: AppColors.textSecondary, size: 20),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -798,13 +835,21 @@ class _UsageTabState extends State<UsageTab> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        app.name,
+                                        app.packageName == 'com.cybnux.tethering_hotspot'
+                                            ? (vpn.isArabic ? 'نقطة اتصال الهواتف (بث)' : 'Tethering & Hotspot')
+                                            : app.packageName == 'com.cybnux.uninstalled_apps'
+                                                ? (vpn.isArabic ? 'تطبيقات محذوفة' : 'Uninstalled Applications')
+                                                : app.name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.bold,
-                                          color: AppColors.textPrimary,
+                                          color: app.packageName == 'com.cybnux.tethering_hotspot'
+                                              ? const Color(0xFFF59E0B)
+                                              : app.packageName == 'com.cybnux.uninstalled_apps'
+                                                  ? const Color(0xFFEF4444)
+                                                  : AppColors.textPrimary,
                                         ),
                                       ),
                                       if (_networkFilter == 'all') ...[

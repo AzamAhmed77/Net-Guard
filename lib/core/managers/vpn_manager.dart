@@ -35,6 +35,25 @@ class VpnManager extends ChangeNotifier {
       ? _todayRealUsageMb
       : _apps.fold(0.0, (sum, a) => sum + a.totalMb);
 
+  // Hotspot Speed Controller State
+  bool _isHotspotRunning = false;
+  int _hotspotPort = 8282;
+  String _hotspotIp = '192.168.43.1';
+  int _hotspotDownloadLimitKbps = -1; // -1 = Unlimited
+  int _hotspotUploadLimitKbps = -1;   // -1 = Unlimited
+  int _hotspotActiveClients = 0;
+  int _hotspotTotalRxBytes = 0;
+  int _hotspotTotalTxBytes = 0;
+
+  bool get isHotspotRunning => _isHotspotRunning;
+  int get hotspotPort => _hotspotPort;
+  String get hotspotIp => _hotspotIp;
+  int get hotspotDownloadLimitKbps => _hotspotDownloadLimitKbps;
+  int get hotspotUploadLimitKbps => _hotspotUploadLimitKbps;
+  int get hotspotActiveClients => _hotspotActiveClients;
+  int get hotspotTotalRxBytes => _hotspotTotalRxBytes;
+  int get hotspotTotalTxBytes => _hotspotTotalTxBytes;
+
   // History & Logs
   final List<double> _downloadHistory = List.generate(30, (_) => 0.0);
   final List<double> _uploadHistory = List.generate(30, (_) => 0.0);
@@ -141,6 +160,11 @@ class VpnManager extends ChangeNotifier {
     final savedConfig = await StorageService.loadConfig();
     if (savedConfig != null) {
       config = savedConfig;
+      if (config.presetMode == 'default' ||
+          config.presetMode == 'eco' ||
+          config.presetMode == 'unlimited') {
+        activePreset = config.presetMode;
+      }
       addLog(
           "OK",
           isArabic
@@ -160,8 +184,27 @@ class VpnManager extends ChangeNotifier {
       config.downloadSpeedLimit = lastManualDownloadLimit;
       config.uploadSpeedLimit = lastManualUploadLimit;
     }
+
+    final savedHotspot = await StorageService.loadHotspotSettings();
+    _hotspotPort = savedHotspot['port'] ?? 8282;
+    _hotspotDownloadLimitKbps = savedHotspot['dlLimit'] ?? -1;
+    _hotspotUploadLimitKbps = savedHotspot['ulLimit'] ?? -1;
+    await refreshHotspotStatus();
+
     await fetchInstalledApps();
     syncNativeSettings();
+
+    try {
+      final nativeEvents = await MethodChannelService.getNativeEventLogs();
+      for (final event in nativeEvents) {
+        if (event is Map) {
+          addLog(
+            event['level']?.toString() ?? 'INFO',
+            event['message']?.toString() ?? '',
+          );
+        }
+      }
+    } catch (_) {}
 
     try {
       final savedAccent = await StorageService.loadAccentColor();
@@ -172,8 +215,16 @@ class VpnManager extends ChangeNotifier {
     } catch (_) {}
 
     MethodChannelService.initializeChannelCallbacks();
-    MethodChannelService.onVpnToggledFromNotification = () {
-      toggleVpn();
+    MethodChannelService.onVpnStateChanged = (bool isRunning) {
+      config.isVpnActive = isRunning;
+      _persistState();
+      notifyListeners();
+    };
+    MethodChannelService.onVpnToggledFromNotification = () async {
+      final isRunning = await MethodChannelService.isVpnRunning();
+      config.isVpnActive = isRunning;
+      _persistState();
+      notifyListeners();
     };
     try {
       _isMonitorRunning = await MethodChannelService.isMonitorRunning();
@@ -199,6 +250,7 @@ class VpnManager extends ChangeNotifier {
   void setPreset(String preset) {
     activePreset = preset;
     activeSecurityProfile = preset;
+    config.presetMode = preset;
     switch (preset) {
       case 'eco':
         config.downloadSpeedLimit = 256;
@@ -273,6 +325,7 @@ class VpnManager extends ChangeNotifier {
     config.downloadSpeedLimit = kbps;
     lastManualDownloadLimit = kbps;
     activePreset = 'default';
+    config.presetMode = 'default';
     StorageService.saveManualLimits(
         lastManualDownloadLimit, lastManualUploadLimit);
     _persistState();
@@ -284,6 +337,7 @@ class VpnManager extends ChangeNotifier {
     config.uploadSpeedLimit = kbps;
     lastManualUploadLimit = kbps;
     activePreset = 'default';
+    config.presetMode = 'default';
     StorageService.saveManualLimits(
         lastManualDownloadLimit, lastManualUploadLimit);
     _persistState();
@@ -297,6 +351,7 @@ class VpnManager extends ChangeNotifier {
     lastManualDownloadLimit = dlKbps;
     lastManualUploadLimit = ulKbps;
     activePreset = 'default';
+    config.presetMode = 'default';
     StorageService.saveManualLimits(
         lastManualDownloadLimit, lastManualUploadLimit);
     _persistState();
@@ -440,6 +495,110 @@ class VpnManager extends ChangeNotifier {
     StorageService.saveAppSettings(_apps);
   }
 
+  // ── Hotspot Speed Controller Methods ──
+  Future<void> refreshHotspotStatus() async {
+    try {
+      final status = await MethodChannelService.getHotspotProxyStatus();
+      if (status.isNotEmpty) {
+        _isHotspotRunning = status['isRunning'] == true;
+        _hotspotPort = (status['port'] as num?)?.toInt() ?? _hotspotPort;
+        _hotspotIp = status['ip']?.toString() ?? _hotspotIp;
+        _hotspotActiveClients = (status['activeClients'] as num?)?.toInt() ?? 0;
+        _hotspotTotalRxBytes = (status['totalRxBytes'] as num?)?.toInt() ?? 0;
+        _hotspotTotalTxBytes = (status['totalTxBytes'] as num?)?.toInt() ?? 0;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<bool> startHotspotProxy() async {
+    final dlBps = _hotspotDownloadLimitKbps > 0
+        ? _hotspotDownloadLimitKbps * 1024
+        : -1;
+    final ulBps = _hotspotUploadLimitKbps > 0
+        ? _hotspotUploadLimitKbps * 1024
+        : -1;
+    final success = await MethodChannelService.startHotspotProxy(
+      port: _hotspotPort,
+      downloadLimit: dlBps,
+      uploadLimit: ulBps,
+    );
+    if (success) {
+      _isHotspotRunning = true;
+      _hotspotIp = await MethodChannelService.getHotspotIp();
+      addLog(
+          "INFO",
+          isArabic
+              ? "تم تشغيل متحكم سرعة نقطة الاتصال (Hotspot) بنجاح على المنفذ $_hotspotPort."
+              : "Hotspot speed controller started on port $_hotspotPort.");
+      await StorageService.saveHotspotSettings(
+        port: _hotspotPort,
+        dlLimit: _hotspotDownloadLimitKbps,
+        ulLimit: _hotspotUploadLimitKbps,
+      );
+      notifyListeners();
+    }
+    return success;
+  }
+
+  Future<void> stopHotspotProxy() async {
+    await MethodChannelService.stopHotspotProxy();
+    _isHotspotRunning = false;
+    _hotspotActiveClients = 0;
+    addLog(
+        "INFO",
+        isArabic
+            ? "تم إيقاف متحكم سرعة بث نقطة الاتصال."
+            : "Hotspot speed controller stopped.");
+    notifyListeners();
+  }
+
+  Future<void> toggleHotspotProxy() async {
+    if (_isHotspotRunning) {
+      await stopHotspotProxy();
+    } else {
+      await startHotspotProxy();
+    }
+  }
+
+  Future<void> setHotspotLimits({
+    required int downloadKbps,
+    required int uploadKbps,
+  }) async {
+    _hotspotDownloadLimitKbps = downloadKbps;
+    _hotspotUploadLimitKbps = uploadKbps;
+    final dlBps = downloadKbps > 0 ? downloadKbps * 1024 : -1;
+    final ulBps = uploadKbps > 0 ? uploadKbps * 1024 : -1;
+    if (_isHotspotRunning) {
+      await MethodChannelService.updateHotspotRates(
+        downloadLimit: dlBps,
+        uploadLimit: ulBps,
+      );
+    }
+    await StorageService.saveHotspotSettings(
+      port: _hotspotPort,
+      dlLimit: downloadKbps,
+      ulLimit: uploadKbps,
+    );
+    notifyListeners();
+  }
+
+  Future<void> setHotspotPort(int port) async {
+    _hotspotPort = port;
+    if (_isHotspotRunning) {
+      await stopHotspotProxy();
+      await startHotspotProxy();
+    } else {
+      await StorageService.saveHotspotSettings(
+        port: port,
+        dlLimit: _hotspotDownloadLimitKbps,
+        ulLimit: _hotspotUploadLimitKbps,
+      );
+      notifyListeners();
+    }
+  }
+
+
   void toggleBlockAllMode(bool blockAll) {
     config.globalMode = blockAll ? 'blacklist' : 'whitelist';
     if (blockAll) {
@@ -504,6 +663,18 @@ class VpnManager extends ChangeNotifier {
 
   void toggleAutoQuarantine(bool val) {
     autoQuarantineNewApps = val;
+    if (!val) {
+      for (final app in _apps) {
+        if (app.isQuarantined) {
+          app.isWifiAllowed = true;
+          app.isMobileAllowed = true;
+          app.isQuarantined = false;
+          app.tempAllowUntil = null;
+        }
+      }
+      StorageService.saveAppSettings(_apps);
+      syncNativeSettings();
+    }
     StorageService.saveAutoQuarantine(val);
     MethodChannelService.setAutoQuarantine(val);
     addLog(
@@ -1073,7 +1244,7 @@ class VpnManager extends ChangeNotifier {
   double _lastNotifiedUp = -1.0;
 
   void _startRealTrafficTicker() {
-    _statsTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+    _statsTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (_statsRequestInFlight) return;
       _statsRequestInFlight = true;
       try {
@@ -1117,7 +1288,7 @@ class VpnManager extends ChangeNotifier {
         }
 
         _tickCount++;
-        if (_tickCount % 5 == 0 || _tickCount == 1) {
+        if (_tickCount % 6 == 0 || _tickCount == 1) {
           final appTraffic = await MethodChannelService.getPerAppTraffic();
           if (appTraffic.isNotEmpty) {
             bool anyUpdated = false;
@@ -1134,6 +1305,10 @@ class VpnManager extends ChangeNotifier {
               notifyListeners();
             }
           }
+        }
+
+        if (_isHotspotRunning && _tickCount % 2 == 0) {
+          await refreshHotspotStatus();
         }
       } catch (_) {
       } finally {

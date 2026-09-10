@@ -6,6 +6,7 @@ import android.app.usage.NetworkStats
 import android.app.usage.NetworkStatsManager
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.net.VpnService
@@ -66,8 +67,12 @@ class MainActivity: FlutterActivity() {
     }
 
     fun toggleVpnFromNative() {
+        syncVpnStateFromNative()
+    }
+
+    fun syncVpnStateFromNative() {
         runOnUiThread {
-            flutterChannel?.invokeMethod("onToggleVpnFromNotification", null)
+            flutterChannel?.invokeMethod("onVpnStateChanged", MyVpnService.isRunning)
         }
     }
 
@@ -97,7 +102,6 @@ class MainActivity: FlutterActivity() {
         } else {
             registerReceiver(statsReceiver, filter)
         }
-        NetworkMonitorService.startService(this)
     }
 
     override fun onDestroy() {
@@ -248,7 +252,9 @@ class MainActivity: FlutterActivity() {
                                         while (w.hasNextBucket()) {
                                             w.getNextBucket(bucket)
                                             val u = bucket.uid
-                                            if (u >= 1000) todayUidBytes[u] = (todayUidBytes[u] ?: 0L) + bucket.rxBytes + bucket.txBytes
+                                            if (u >= 1000 || u == NetworkStats.Bucket.UID_TETHERING || u == NetworkStats.Bucket.UID_REMOVED) {
+                                                todayUidBytes[u] = (todayUidBytes[u] ?: 0L) + bucket.rxBytes + bucket.txBytes
+                                            }
                                         }
                                         w.close()
                                     } catch (_: Exception) {}
@@ -258,7 +264,9 @@ class MainActivity: FlutterActivity() {
                                         while (c.hasNextBucket()) {
                                             c.getNextBucket(bucket)
                                             val u = bucket.uid
-                                            if (u >= 1000) todayUidBytes[u] = (todayUidBytes[u] ?: 0L) + bucket.rxBytes + bucket.txBytes
+                                            if (u >= 1000 || u == NetworkStats.Bucket.UID_TETHERING || u == NetworkStats.Bucket.UID_REMOVED) {
+                                                todayUidBytes[u] = (todayUidBytes[u] ?: 0L) + bucket.rxBytes + bucket.txBytes
+                                            }
                                         }
                                         c.close()
                                     } catch (_: Exception) {}
@@ -311,6 +319,36 @@ class MainActivity: FlutterActivity() {
                                     
                                     appsList.add(map)
                                 }
+                            }
+
+                            // Append Tethering and Uninstalled apps if they had data traffic today
+                            val installedUids = packages.mapNotNull { it.applicationInfo?.uid }.toSet()
+                            val tetherBytes = todayUidBytes[NetworkStats.Bucket.UID_TETHERING] ?: 0L
+                            if (tetherBytes > 0L) {
+                                val tMap = HashMap<String, Any>()
+                                tMap["packageName"] = "com.cybnux.tethering_hotspot"
+                                tMap["appName"] = "نقطة اتصال الهواتف (بث)"
+                                tMap["uid"] = NetworkStats.Bucket.UID_TETHERING
+                                tMap["isSystem"] = true
+                                tMap["totalMb"] = tetherBytes.toDouble() / (1024.0 * 1024.0)
+                                tMap["appIcon"] = ""
+                                appsList.add(tMap)
+                            }
+                            var removedBytes = todayUidBytes[NetworkStats.Bucket.UID_REMOVED] ?: 0L
+                            for ((u, b) in todayUidBytes) {
+                                if (u >= 1000 && !installedUids.contains(u)) {
+                                    removedBytes += b
+                                }
+                            }
+                            if (removedBytes > 0L) {
+                                val rMap = HashMap<String, Any>()
+                                rMap["packageName"] = "com.cybnux.uninstalled_apps"
+                                rMap["appName"] = "تطبيقات محذوفة"
+                                rMap["uid"] = NetworkStats.Bucket.UID_REMOVED
+                                rMap["isSystem"] = false
+                                rMap["totalMb"] = removedBytes.toDouble() / (1024.0 * 1024.0)
+                                rMap["appIcon"] = ""
+                                appsList.add(rMap)
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error getting packages: ${e.message}")
@@ -491,6 +529,23 @@ class MainActivity: FlutterActivity() {
                                             map[pkgName] = b.toDouble() / (1024.0 * 1024.0)
                                         }
                                     }
+
+                                    val tetherBytes = uidBytesMap[NetworkStats.Bucket.UID_TETHERING] ?: 0L
+                                    if (tetherBytes > 0L) {
+                                        map["com.cybnux.tethering_hotspot"] = tetherBytes.toDouble() / (1024.0 * 1024.0)
+                                    }
+
+                                    var removedBytes = uidBytesMap[NetworkStats.Bucket.UID_REMOVED] ?: 0L
+                                    val knownUids = cachedPackageUids.values.toSet()
+                                    for ((u, b) in uidBytesMap) {
+                                        if (u >= 1000 && !knownUids.contains(u) && b > 0L) {
+                                            removedBytes += b
+                                        }
+                                    }
+                                    if (removedBytes > 0L) {
+                                        map["com.cybnux.uninstalled_apps"] = removedBytes.toDouble() / (1024.0 * 1024.0)
+                                    }
+
                                     runOnUiThread {
                                         result.success(map)
                                     }
@@ -602,7 +657,7 @@ class MainActivity: FlutterActivity() {
                                     while (wifiDetails.hasNextBucket()) {
                                         wifiDetails.getNextBucket(bucket)
                                         val u = bucket.uid
-                                        if (u >= 1000) {
+                                        if (u >= 1000 || u == NetworkStats.Bucket.UID_TETHERING || u == NetworkStats.Bucket.UID_REMOVED) {
                                             uidMap[u] = (uidMap[u] ?: 0L) + bucket.rxBytes + bucket.txBytes
                                         }
                                     }
@@ -614,20 +669,50 @@ class MainActivity: FlutterActivity() {
                                     while (cellDetails.hasNextBucket()) {
                                         cellDetails.getNextBucket(bucket)
                                         val u = bucket.uid
-                                        if (u >= 1000) {
+                                        if (u >= 1000 || u == NetworkStats.Bucket.UID_TETHERING || u == NetworkStats.Bucket.UID_REMOVED) {
                                             uidMap[u] = (uidMap[u] ?: 0L) + bucket.rxBytes + bucket.txBytes
                                         }
                                     }
                                     cellDetails.close()
                                 } catch (_: Exception) {}
 
+                                if (uidMap.isEmpty()) {
+                                    val pm = packageManager
+                                    val installed = pm.getInstalledApplications(0)
+                                    for (app in installed) {
+                                        if (app.uid >= 1000) {
+                                            try {
+                                                val s = nsm.queryDetailsForUid(NetworkCapabilities.TRANSPORT_CELLULAR, null, periodStartTime, now, app.uid)
+                                                var bSum = 0L
+                                                while (s.hasNextBucket()) {
+                                                    s.getNextBucket(bucket)
+                                                    bSum += (bucket.rxBytes + bucket.txBytes)
+                                                }
+                                                s.close()
+                                                if (bSum > 0L) {
+                                                    uidMap[app.uid] = (uidMap[app.uid] ?: 0L) + bSum
+                                                }
+                                            } catch (_: Exception) {}
+                                        }
+                                    }
+                                }
+
                                 val pm = packageManager
                                 for ((uid, bytes) in uidMap) {
                                     if (bytes > 0L) {
-                                        val pkgs = pm.getPackagesForUid(uid)
-                                        if (pkgs != null) {
-                                            for (pkg in pkgs) {
-                                                appUsageMap[pkg] = (appUsageMap[pkg] ?: 0.0) + (bytes.toDouble() / (1024.0 * 1024.0))
+                                        val mb = bytes.toDouble() / (1024.0 * 1024.0)
+                                        if (uid == NetworkStats.Bucket.UID_TETHERING) {
+                                            appUsageMap["com.cybnux.tethering_hotspot"] = (appUsageMap["com.cybnux.tethering_hotspot"] ?: 0.0) + mb
+                                        } else if (uid == NetworkStats.Bucket.UID_REMOVED) {
+                                            appUsageMap["com.cybnux.uninstalled_apps"] = (appUsageMap["com.cybnux.uninstalled_apps"] ?: 0.0) + mb
+                                        } else {
+                                            val pkgs = pm.getPackagesForUid(uid)
+                                            if (pkgs != null && pkgs.isNotEmpty()) {
+                                                for (pkg in pkgs) {
+                                                    appUsageMap[pkg] = (appUsageMap[pkg] ?: 0.0) + mb
+                                                }
+                                            } else {
+                                                appUsageMap["com.cybnux.uninstalled_apps"] = (appUsageMap["com.cybnux.uninstalled_apps"] ?: 0.0) + mb
                                             }
                                         }
                                     }
@@ -833,11 +918,12 @@ class MainActivity: FlutterActivity() {
                                 }
 
                                 val bucket = NetworkStats.Bucket()
+                                val pm = packageManager
 
-                                // WiFi per-app
+                                // ── WiFi per-app ──
+                                val uidWifi = HashMap<Int, Long>()
                                 try {
                                     val wifiDetails = nsm.queryDetails(NetworkCapabilities.TRANSPORT_WIFI, null, periodStart, periodEnd)
-                                    val uidWifi = HashMap<Int, Long>()
                                     while (wifiDetails.hasNextBucket()) {
                                         wifiDetails.getNextBucket(bucket)
                                         val u = bucket.uid
@@ -848,43 +934,168 @@ class MainActivity: FlutterActivity() {
                                         }
                                     }
                                     wifiDetails.close()
-                                    val pm = packageManager
-                                    for ((uid, bytes) in uidWifi) {
-                                        val pkgs = pm.getPackagesForUid(uid)
-                                        if (pkgs != null) {
-                                            for (pkg in pkgs) {
-                                                wifiMap[pkg] = (wifiMap[pkg] ?: 0.0) + (bytes.toDouble() / (1024.0 * 1024.0))
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "WiFi details query err: ${e.message}")
+                                }
+
+                                if (uidWifi.isEmpty()) {
+                                    try {
+                                        val wifiSummary = nsm.querySummary(NetworkCapabilities.TRANSPORT_WIFI, null, periodStart, periodEnd)
+                                        while (wifiSummary.hasNextBucket()) {
+                                            wifiSummary.getNextBucket(bucket)
+                                            val u = bucket.uid
+                                            val b = bucket.rxBytes + bucket.txBytes
+                                            if (totalWifiBytes == 0L) totalWifiBytes += b
+                                            if (u >= 1000) {
+                                                uidWifi[u] = (uidWifi[u] ?: 0L) + b
+                                            }
+                                        }
+                                        wifiSummary.close()
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "WiFi summary query err: ${e.message}")
+                                    }
+                                }
+
+                                for ((uid, bytes) in uidWifi) {
+                                    if (bytes > 0L) {
+                                        val mb = bytes.toDouble() / (1024.0 * 1024.0)
+                                        if (uid == NetworkStats.Bucket.UID_TETHERING) {
+                                            wifiMap["com.cybnux.tethering_hotspot"] = (wifiMap["com.cybnux.tethering_hotspot"] ?: 0.0) + mb
+                                        } else if (uid == NetworkStats.Bucket.UID_REMOVED) {
+                                            wifiMap["com.cybnux.uninstalled_apps"] = (wifiMap["com.cybnux.uninstalled_apps"] ?: 0.0) + mb
+                                        } else {
+                                            val pkgs = pm.getPackagesForUid(uid)
+                                            if (pkgs != null && pkgs.isNotEmpty()) {
+                                                for (pkg in pkgs) {
+                                                    wifiMap[pkg] = (wifiMap[pkg] ?: 0.0) + mb
+                                                }
+                                            } else {
+                                                wifiMap["com.cybnux.uninstalled_apps"] = (wifiMap["com.cybnux.uninstalled_apps"] ?: 0.0) + mb
                                             }
                                         }
                                     }
-                                } catch (_: Exception) {}
+                                }
 
-                                // Mobile per-app
+                                // ── Mobile per-app ──
+                                val uidMobile = HashMap<Int, Long>()
+                                // 1. Try querySummary first for total cellular traffic (permission-safe on Android 10/11)
                                 try {
-                                    val cellDetails = nsm.queryDetails(NetworkCapabilities.TRANSPORT_CELLULAR, null, periodStart, periodEnd)
-                                    val uidMobile = HashMap<Int, Long>()
-                                    while (cellDetails.hasNextBucket()) {
-                                        cellDetails.getNextBucket(bucket)
+                                    val cellSummary = nsm.querySummary(NetworkCapabilities.TRANSPORT_CELLULAR, null, periodStart, periodEnd)
+                                    while (cellSummary.hasNextBucket()) {
+                                        cellSummary.getNextBucket(bucket)
                                         val u = bucket.uid
                                         val b = bucket.rxBytes + bucket.txBytes
                                         totalMobileBytes += b
-                                        if (u >= 1000) {
+                                        if (u >= 1000 || u == NetworkStats.Bucket.UID_TETHERING || u == NetworkStats.Bucket.UID_REMOVED) {
                                             uidMobile[u] = (uidMobile[u] ?: 0L) + b
                                         }
                                     }
-                                    cellDetails.close()
-                                    val pm = packageManager
-                                    for ((uid, bytes) in uidMobile) {
-                                        val pkgs = pm.getPackagesForUid(uid)
-                                        if (pkgs != null) {
-                                            for (pkg in pkgs) {
-                                                mobileMap[pkg] = (mobileMap[pkg] ?: 0.0) + (bytes.toDouble() / (1024.0 * 1024.0))
+                                    cellSummary.close()
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Cell summary query err: ${e.message}")
+                                }
+
+                                // 2. If no per-uid stats yet, try queryDetails
+                                if (uidMobile.isEmpty()) {
+                                    try {
+                                        val cellDetails = nsm.queryDetails(NetworkCapabilities.TRANSPORT_CELLULAR, null, periodStart, periodEnd)
+                                        while (cellDetails.hasNextBucket()) {
+                                            cellDetails.getNextBucket(bucket)
+                                            val u = bucket.uid
+                                            val b = bucket.rxBytes + bucket.txBytes
+                                            if (totalMobileBytes == 0L) totalMobileBytes += b
+                                            if (u >= 1000 || u == NetworkStats.Bucket.UID_TETHERING || u == NetworkStats.Bucket.UID_REMOVED) {
+                                                uidMobile[u] = (uidMobile[u] ?: 0L) + b
+                                            }
+                                        }
+                                        cellDetails.close()
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "Cell details query err: ${e.message}")
+                                    }
+                                }
+
+                                // 3. Fallback: queryDetailsForUid per installed app (Official Android 10+ standard)
+                                if (uidMobile.isEmpty()) {
+                                    try {
+                                        val installed = pm.getInstalledApplications(0)
+                                        for (app in installed) {
+                                            if (app.uid >= 1000 && !uidMobile.containsKey(app.uid)) {
+                                                try {
+                                                    val uidStats = nsm.queryDetailsForUid(NetworkCapabilities.TRANSPORT_CELLULAR, null, periodStart, periodEnd, app.uid)
+                                                    var appBytes = 0L
+                                                    while (uidStats.hasNextBucket()) {
+                                                        uidStats.getNextBucket(bucket)
+                                                        appBytes += (bucket.rxBytes + bucket.txBytes)
+                                                    }
+                                                    uidStats.close()
+                                                    if (appBytes > 0L) {
+                                                        uidMobile[app.uid] = appBytes
+                                                        if (totalMobileBytes == 0L) totalMobileBytes += appBytes
+                                                    }
+                                                } catch (_: Exception) {}
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "queryDetailsForUid cellular err: ${e.message}")
+                                    }
+                                }
+
+                                for ((uid, bytes) in uidMobile) {
+                                    if (bytes > 0L) {
+                                        val mb = bytes.toDouble() / (1024.0 * 1024.0)
+                                        if (uid == NetworkStats.Bucket.UID_TETHERING) {
+                                            mobileMap["com.cybnux.tethering_hotspot"] = (mobileMap["com.cybnux.tethering_hotspot"] ?: 0.0) + mb
+                                        } else if (uid == NetworkStats.Bucket.UID_REMOVED) {
+                                            mobileMap["com.cybnux.uninstalled_apps"] = (mobileMap["com.cybnux.uninstalled_apps"] ?: 0.0) + mb
+                                        } else {
+                                            val pkgs = pm.getPackagesForUid(uid)
+                                            if (pkgs != null && pkgs.isNotEmpty()) {
+                                                for (pkg in pkgs) {
+                                                    mobileMap[pkg] = (mobileMap[pkg] ?: 0.0) + mb
+                                                }
+                                            } else {
+                                                mobileMap["com.cybnux.uninstalled_apps"] = (mobileMap["com.cybnux.uninstalled_apps"] ?: 0.0) + mb
                                             }
                                         }
                                     }
-                                } catch (_: Exception) {}
+                                }
+
+                                // 4. Live real-time VPN usage injection for "today"
+                                if (session == "today") {
+                                    val liveUsage = MyVpnService.instance?.getPerAppUsageMap() ?: emptyMap()
+                                    val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                                    val isWifiActive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                        val active = cm?.activeNetwork
+                                        val caps = cm?.getNetworkCapabilities(active)
+                                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        cm?.activeNetworkInfo?.type == ConnectivityManager.TYPE_WIFI
+                                    }
+
+                                    for ((pkg, bytes) in liveUsage) {
+                                        val mb = bytes.toDouble() / (1024.0 * 1024.0)
+                                        if (mb > 0.0) {
+                                            if (isWifiActive) {
+                                                val curr = wifiMap[pkg] ?: 0.0
+                                                if (mb > curr) {
+                                                    wifiMap[pkg] = mb
+                                                    totalWifiBytes += (bytes - (curr * 1024 * 1024).toLong()).coerceAtLeast(0L)
+                                                }
+                                            } else {
+                                                val curr = mobileMap[pkg] ?: 0.0
+                                                if (mb > curr) {
+                                                    mobileMap[pkg] = mb
+                                                    totalMobileBytes += (bytes - (curr * 1024 * 1024).toLong()).coerceAtLeast(0L)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in getPerAppTrafficByNetwork: ${e.message}")
+                        }
 
                         val res = HashMap<String, Any>()
                         res["wifi"] = wifiMap
@@ -917,6 +1128,21 @@ class MainActivity: FlutterActivity() {
                             Log.e(TAG, "Error reading daily log: ${e.message}")
                         }
                     }
+                    result.success(list)
+                }
+                "getNativeEventLogs" -> {
+                    val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+                    val events = org.json.JSONArray(prefs.getString("native_event_logs", "[]"))
+                    val list = ArrayList<Map<String, Any>>()
+                    for (index in 0 until events.length()) {
+                        val event = events.optJSONObject(index) ?: continue
+                        list.add(hashMapOf(
+                            "level" to event.optString("level", "INFO"),
+                            "message" to event.optString("message"),
+                            "time" to event.optLong("time", 0L),
+                        ))
+                    }
+                    prefs.edit().remove("native_event_logs").apply()
                     result.success(list)
                 }
                 "startMonitorService" -> {
@@ -1026,6 +1252,30 @@ class MainActivity: FlutterActivity() {
                     prefs.edit().putString("app_language", lang).apply()
                     NetworkMonitorService.instance?.updateNotification()
                     result.success(true)
+                }
+                "startHotspotProxy" -> {
+                    val port = call.argument<Int>("port") ?: 8282
+                    val downloadLimit = call.argument<Number>("downloadLimit")?.toLong() ?: -1L
+                    val uploadLimit = call.argument<Number>("uploadLimit")?.toLong() ?: -1L
+                    val success = HotspotProxyServer.instance.start(port, downloadLimit, uploadLimit)
+                    result.success(success)
+                }
+                "stopHotspotProxy" -> {
+                    HotspotProxyServer.instance.stop()
+                    result.success(true)
+                }
+                "updateHotspotRates" -> {
+                    val downloadLimit = call.argument<Number>("downloadLimit")?.toLong() ?: -1L
+                    val uploadLimit = call.argument<Number>("uploadLimit")?.toLong() ?: -1L
+                    HotspotProxyServer.instance.setRates(downloadLimit, uploadLimit)
+                    result.success(true)
+                }
+                "getHotspotProxyStatus" -> {
+                    val status = HotspotProxyServer.instance.getStatus()
+                    result.success(status)
+                }
+                "getHotspotIp" -> {
+                    result.success(HotspotProxyServer.getHotspotIpAddress())
                 }
                 else -> {
                     result.notImplemented()

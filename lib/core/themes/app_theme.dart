@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
@@ -15,7 +14,7 @@ class AppTheme {
         surface: AppColors.surfaceDark,
         error: AppColors.red,
       ),
-      textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
+      fontFamily: 'sans-serif',
       cardTheme: CardThemeData(
         color: AppColors.surfaceCardDark,
         shape: RoundedRectangleBorder(
@@ -38,7 +37,7 @@ class AppTheme {
         surface: AppColors.surfaceLight,
         error: AppColors.red,
       ),
-      textTheme: GoogleFonts.cairoTextTheme(ThemeData.light().textTheme),
+      fontFamily: 'sans-serif',
       cardTheme: CardThemeData(
         color: AppColors.surfaceCardLight,
         shape: RoundedRectangleBorder(

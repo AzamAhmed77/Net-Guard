@@ -4,10 +4,10 @@
     android:layout_height="wrap_content"
     android:paddingStart="4dp"
     android:paddingEnd="4dp"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp">
+    android:paddingTop="0dp"
+    android:paddingBottom="0dp">
 
-    <!-- Start / Stop Button on the Right Side (Exact red circled area) -->
+    <!-- Start / Stop Button on the End Side (Adaptive with high-contrast text) -->
     <TextView
         android:id="@+id/btn_notif_vpn"
         android:layout_width="wrap_content"
@@ -19,17 +19,17 @@
         android:layout_marginLeft="8dp"
         android:background="@drawable/bg_notif_btn_green"
         android:gravity="center"
-        android:minHeight="32dp"
-        android:paddingStart="10dp"
-        android:paddingEnd="10dp"
-        android:paddingTop="5dp"
-        android:paddingBottom="5dp"
-        android:text="⚡ تشغيل الحماية"
+        android:minHeight="28dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:text="⚡ تشغيل"
         android:textColor="#FFFFFF"
         android:textSize="12sp"
         android:textStyle="bold" />
 
-    <!-- Left side: Speeds and Daily Data Usage -->
+    <!-- Left / Start side: Speeds and Daily Data Usage (System-Adaptive Colors) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -40,28 +40,32 @@
         android:layout_centerVertical="true"
         android:orientation="vertical">
 
-        <!-- Line 1: Download & Upload Speeds -->
+        <!-- Line 1: Download & Upload Speeds (Pure High-Contrast White) -->
         <TextView
             android:id="@+id/tv_notif_line1"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:padding="0dp"
             android:text="↓ 0.0 KB/s    •    ↑ 0.0 KB/s"
             android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textSize="13.5sp"
             android:textStyle="bold"
             android:textDirection="locale"
             android:singleLine="true"
             android:ellipsize="end" />
 
-        <!-- Line 2: WiFi & Mobile Data Usage -->
+        <!-- Line 2: WiFi & Mobile Data Usage (Bright High-Contrast Silver White) -->
         <TextView
             android:id="@+id/tv_notif_line2"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="1dp"
+            android:includeFontPadding="false"
+            android:padding="0dp"
             android:text="واي فاي: 0.0 MB   •   بيانات: 0.0 MB"
-            android:textColor="#A0A0A0"
-            android:textSize="11.5sp"
+            android:textColor="#E0E0E0"
+            android:textSize="11sp"
             android:textDirection="locale"
             android:singleLine="true"
             android:ellipsize="end" />

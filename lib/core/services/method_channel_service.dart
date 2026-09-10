@@ -140,6 +140,16 @@ class MethodChannelService {
     }
   }
 
+  static Future<List<dynamic>> getNativeEventLogs() async {
+    try {
+      final List<dynamic>? res =
+          await _channel.invokeMethod('getNativeEventLogs');
+      return res ?? [];
+    } on PlatformException {
+      return [];
+    }
+  }
+
   static Future<void> updateSettings({
     int downloadLimit = 0,
     int uploadLimit = 0,
@@ -243,12 +253,17 @@ class MethodChannelService {
     } catch (_) {}
   }
 
+  static Function(bool isRunning)? onVpnStateChanged;
   static Function()? onVpnToggledFromNotification;
 
   static void initializeChannelCallbacks() {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'onToggleVpnFromNotification') {
-        onVpnToggledFromNotification?.call();
+      if (call.method == 'onVpnStateChanged') {
+        final bool isRunning = call.arguments == true;
+        onVpnStateChanged?.call(isRunning);
+      } else if (call.method == 'onToggleVpnFromNotification') {
+        final isRunning = await isVpnRunning();
+        onVpnStateChanged?.call(isRunning);
       }
     });
   }
@@ -330,4 +345,63 @@ class MethodChannelService {
     } catch (_) {}
     return {};
   }
+
+  // ── Hotspot Proxy Server ──
+  static Future<bool> startHotspotProxy({
+    int port = 8282,
+    int downloadLimit = -1,
+    int uploadLimit = -1,
+  }) async {
+    try {
+      final res = await _channel.invokeMethod('startHotspotProxy', {
+        'port': port,
+        'downloadLimit': downloadLimit,
+        'uploadLimit': uploadLimit,
+      });
+      return res == true;
+    } catch (e) {
+      debugPrint('Error starting hotspot proxy: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> stopHotspotProxy() async {
+    try {
+      final res = await _channel.invokeMethod('stopHotspotProxy');
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> updateHotspotRates({
+    required int downloadLimit,
+    required int uploadLimit,
+  }) async {
+    try {
+      await _channel.invokeMethod('updateHotspotRates', {
+        'downloadLimit': downloadLimit,
+        'uploadLimit': uploadLimit,
+      });
+    } catch (_) {}
+  }
+
+  static Future<Map<String, dynamic>> getHotspotProxyStatus() async {
+    try {
+      final Map<dynamic, dynamic>? res =
+          await _channel.invokeMethod('getHotspotProxyStatus');
+      if (res != null) return Map<String, dynamic>.from(res);
+    } catch (_) {}
+    return {};
+  }
+
+  static Future<String> getHotspotIp() async {
+    try {
+      final String? ip = await _channel.invokeMethod('getHotspotIp');
+      return ip ?? '192.168.43.1';
+    } catch (_) {
+      return '192.168.43.1';
+    }
+  }
 }
+

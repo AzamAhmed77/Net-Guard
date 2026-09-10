@@ -4,11 +4,20 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import org.json.JSONArray
+import org.json.JSONObject
 
 class PackageReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val pkgName = intent.data?.schemeSpecificPart ?: return
+        if (intent.action == Intent.ACTION_PACKAGE_REMOVED) {
+            appendEvent(context, "WARN", "تم حذف التطبيق: $pkgName")
+            Log.i("PackageReceiver", "App removed: $pkgName")
+            return
+        }
+
         if (intent.action == Intent.ACTION_PACKAGE_ADDED) {
-            val pkgName = intent.data?.schemeSpecificPart ?: return
+            appendEvent(context, "INFO", "تم تثبيت تطبيق: $pkgName")
             Log.i("PackageReceiver", "New app installed: $pkgName")
 
             val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
@@ -25,14 +34,23 @@ class PackageReceiver : BroadcastReceiver() {
                     .apply()
 
                 if (MyVpnService.isRunning) {
-                    val updateIntent = Intent(context, MyVpnService::class.java).apply {
-                        action = MyVpnService.ACTION_UPDATE_SETTINGS
-                        putStringArrayListExtra(MyVpnService.EXTRA_BLOCKED_WIFI_APPS, ArrayList(blockedWifi))
-                        putStringArrayListExtra(MyVpnService.EXTRA_BLOCKED_DATA_APPS, ArrayList(blockedData))
+                    MyVpnService.buildUpdateIntentFromPrefs(context)?.let { updateIntent ->
+                        context.startService(updateIntent)
                     }
-                    context.startService(updateIntent)
                 }
             }
         }
+    }
+
+    private fun appendEvent(context: Context, level: String, message: String) {
+        val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+        val events = JSONArray(prefs.getString("native_event_logs", "[]"))
+        events.put(JSONObject().apply {
+            put("level", level)
+            put("message", message)
+            put("time", System.currentTimeMillis())
+        })
+        while (events.length() > 50) events.remove(0)
+        prefs.edit().putString("native_event_logs", events.toString()).apply()
     }
 }

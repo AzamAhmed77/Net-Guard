@@ -141,6 +141,10 @@ class VpnWorker(private val vpnService: VpnService) {
         return json.toString()
     }
 
+    fun getPerAppUsageMap(): Map<String, Long> {
+        return HashMap(perAppBytes)
+    }
+
     @Volatile private var dnsAdBlock: Boolean = false
     @Volatile private var dnsAdultBlock: Boolean = false
     @Volatile private var dnsSocialBlock: Boolean = false
@@ -214,6 +218,12 @@ class VpnWorker(private val vpnService: VpnService) {
 
         thReader?.interrupt(); thWriter?.interrupt(); thNet?.interrupt()
 
+        listOf(thReader, thWriter, thNet).forEach { thread ->
+            try { thread?.join(500) } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }
+
         for (e in udpTable.values) { try { e.ch.close() } catch (_: Exception) {} }
         for (e in tcpTable.values) { try { e.ch.close() } catch (_: Exception) {} }
         udpTable.clear(); tcpTable.clear()
@@ -238,6 +248,9 @@ class VpnWorker(private val vpnService: VpnService) {
                 toDeviceQueue.add(ScheduledPacket(pkt.data, minOf(pkt.sendTimeMs, now)))
             }
         }
+        refillTokens()
+        resumePausedTcpReaders()
+        selector?.wakeup()
         synchronized(queueLock) {
             queueLock.notifyAll()
         }
@@ -357,6 +370,9 @@ class VpnWorker(private val vpnService: VpnService) {
                 udpTable.remove(key)
             }
         }
+        refillTokens()
+        resumePausedTcpReaders()
+        selector?.wakeup()
     }
 
     fun updateAppSpeedConfigs(configJson: String) {
@@ -429,6 +445,9 @@ class VpnWorker(private val vpnService: VpnService) {
             }
 
             Log.i(TAG, "App speed configs updated: ${modes.size} apps configured")
+            refillTokens()
+            resumePausedTcpReaders()
+            selector?.wakeup()
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing app speed configs: ${e.message}")
         }
@@ -563,7 +582,9 @@ class VpnWorker(private val vpnService: VpnService) {
                 if (appLimiter.limitBps == 0L) {
                     return // 0 KB/s: drop packet completely
                 }
-                if (toDeviceQueue.size > 500) return
+                if (toDeviceQueue.size > 500) {
+                    for (entry in tcpTable.values) pauseTcpReader(entry)
+                }
                 synchronized(nextAppDlSendTimeMs) {
                     val baseTime = maxOf(now, nextAppDlSendTimeMs[pkg] ?: 0L)
                     sendTime = baseTime
@@ -575,7 +596,9 @@ class VpnWorker(private val vpnService: VpnService) {
                 if (downloadBps == 0L) {
                     return // 0 KB/s: drop packet completely
                 }
-                if (toDeviceQueue.size > 500) return
+                if (toDeviceQueue.size > 500) {
+                    for (entry in tcpTable.values) pauseTcpReader(entry)
+                }
                 synchronized(this) {
                     val baseTime = maxOf(now, nextDlSendTimeMs)
                     sendTime = baseTime
@@ -727,7 +750,19 @@ class VpnWorker(private val vpnService: VpnService) {
                 while (true) { val r = regQueue.poll() ?: break; r() }
 
                 val sel = selector ?: break
-                val selectTimeout = if (tcpTable.isEmpty() && udpTable.isEmpty()) 3000L else if (rxBytesThisSecond == 0L && txBytesThisSecond == 0L) 1000L else 100L
+                val hasPausedTcp = tcpTable.values.any { entry ->
+                    val k = entry.key
+                    k != null && k.isValid && (k.interestOps() and SelectionKey.OP_READ) == 0
+                }
+                val selectTimeout = if (hasPausedTcp) {
+                    10L
+                } else if (tcpTable.isEmpty() && udpTable.isEmpty()) {
+                    2000L
+                } else if (rxBytesThisSecond == 0L && txBytesThisSecond == 0L) {
+                    500L
+                } else {
+                    15L
+                }
                 sel.select(selectTimeout)
 
                 val iter = sel.selectedKeys().iterator()
@@ -754,6 +789,7 @@ class VpnWorker(private val vpnService: VpnService) {
                 val now = System.currentTimeMillis()
                 
                 refillTokens()
+                resumePausedTcpReaders()
                 for (entry in tcpTable.values) {
                     if (entry.writeQueue.isNotEmpty()) {
                         writePendingTcp(entry)
@@ -852,9 +888,15 @@ class VpnWorker(private val vpnService: VpnService) {
             val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_UDP, sA, sP, dA, dP)
             val pkg = getPackageNameForUid(uid)
             
-            val isMuted = pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L
-            if (pkg != null && (isAppBlockedByFirewall(pkg) || isMuted)) {
-                Log.i(TAG, "Firewall/Muted Blocked UDP packet from: $pkg")
+            val isMuted = (pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L) ||
+                          (downloadBps == 0L && uploadBps == 0L && shouldThrottleApp(pkg))
+            val isBlocked = if (pkg != null) {
+                isAppBlockedByFirewall(pkg) || isMuted
+            } else {
+                firewallBlockAll || isMuted
+            }
+            if (isBlocked) {
+                Log.i(TAG, "Firewall/Muted Blocked UDP packet from: ${pkg ?: "UNKNOWN_UID"}")
                 return
             }
 
@@ -934,6 +976,12 @@ class VpnWorker(private val vpnService: VpnService) {
             }
 
             queueDownloadPacket(buildUdp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort, payload), e.packageName)
+            
+            // Fast close ephemeral DNS query sockets upon receiving response
+            if (e.dstPort == 53) {
+                val key = "${e.srcAddr.hex()}:${e.srcPort}>${e.dstAddr.hex()}:${e.dstPort}"
+                removeUdp(key, e)
+            }
         } catch (ex: Exception) { Log.w(TAG, "UDP recv err: ${ex.message}") }
     }
 
@@ -966,9 +1014,16 @@ class VpnWorker(private val vpnService: VpnService) {
             val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_TCP, sA, sP, dA, dP)
             val pkg = getPackageNameForUid(uid)
 
-            val isMuted = pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L
-            if (pkg != null && (isAppBlockedByFirewall(pkg) || isMuted)) {
-                Log.i(TAG, "Firewall/Muted Blocked TCP connection from: $pkg")
+            val isMuted = (pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L) ||
+                          (downloadBps == 0L && uploadBps == 0L && shouldThrottleApp(pkg))
+            val isBlocked = if (pkg != null) {
+                isAppBlockedByFirewall(pkg) || isMuted
+            } else {
+                firewallBlockAll || isMuted
+            }
+
+            if (isBlocked) {
+                Log.i(TAG, "Firewall/Muted Blocked TCP connection from: ${pkg ?: "UNKNOWN_UID"}")
                 rstTo(dA, sA, dP, sP, ack, seq + 1)
                 return
             }
@@ -1144,6 +1199,33 @@ class VpnWorker(private val vpnService: VpnService) {
 
     private fun onInTcp(e: TcpEntry) {
         if (e.state != TState.ESTABLISHED && e.state != TState.SYN_RECV) return
+
+        val pkg = e.packageName
+        val shouldThrottle = shouldThrottleApp(pkg)
+        val appLimiter = if (shouldThrottle && pkg != null) getAppDlLimiter(pkg) else null
+
+        // ── TCP Ingress Backpressure: Verify tokens BEFORE reading from internet ──
+        if (shouldThrottle) {
+            if (appLimiter != null) {
+                if (appLimiter.limitBps == 0L || appLimiter.getAvailableTokens() <= 0) {
+                    pauseTcpReader(e)
+                    return
+                }
+            } else if (downloadBps >= 0) {
+                if (downloadBps == 0L) {
+                    pauseTcpReader(e)
+                    return
+                }
+                synchronized(this) {
+                    refillTokens()
+                    if (dlTokens <= 0) {
+                        pauseTcpReader(e)
+                        return
+                    }
+                }
+            }
+        }
+
         val buf = ByteBuffer.allocate(MTU - 40)
         try {
             val n = e.ch.read(buf)
@@ -1160,6 +1242,23 @@ class VpnWorker(private val vpnService: VpnService) {
             rxBytesThisSecond += n
             checkDataCap(n)
 
+            // Deduct tokens and apply immediate backpressure if bucket is depleted
+            if (shouldThrottle) {
+                if (appLimiter != null) {
+                    appLimiter.consumeTokens(n.toLong())
+                    if (appLimiter.getAvailableTokens() <= 0) {
+                        pauseTcpReader(e)
+                    }
+                } else if (downloadBps > 0) {
+                    synchronized(this) {
+                        dlTokens = maxOf(0L, dlTokens - n)
+                        if (dlTokens <= 0) {
+                            pauseTcpReader(e)
+                        }
+                    }
+                }
+            }
+
             queueDownloadPacket(buildTcp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort,
                 e.mySeq, e.myAck, ACK or PSH, data), e.packageName)
             e.mySeq += n
@@ -1167,6 +1266,48 @@ class VpnWorker(private val vpnService: VpnService) {
             Log.w(TAG, "TCP recv err: ${ex.message}")
             val key = "${e.srcAddr.hex()}:${e.srcPort}>${e.dstAddr.hex()}:${e.dstPort}"
             removeTcp(key)
+        }
+    }
+
+    private fun pauseTcpReader(e: TcpEntry) {
+        try {
+            val k = e.key ?: return
+            if (k.isValid) {
+                val ops = k.interestOps()
+                if ((ops and SelectionKey.OP_READ) != 0) {
+                    k.interestOps(ops and SelectionKey.OP_READ.inv())
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun resumePausedTcpReaders() {
+        for (e in tcpTable.values) {
+            val k = e.key ?: continue
+            if (!k.isValid) continue
+            val ops = k.interestOps()
+            if ((ops and SelectionKey.OP_READ) == 0) {
+                val pkg = e.packageName
+                val shouldThrottle = shouldThrottleApp(pkg)
+                var canRead = true
+                if (shouldThrottle) {
+                    val appLimiter = if (pkg != null) getAppDlLimiter(pkg) else null
+                    if (appLimiter != null) {
+                        if (appLimiter.limitBps <= 0L || appLimiter.getAvailableTokens() <= 0) {
+                            canRead = false
+                        }
+                    } else if (downloadBps >= 0) {
+                        if (downloadBps == 0L || dlTokens <= 0) {
+                            canRead = false
+                        }
+                    }
+                }
+                if (canRead) {
+                    try {
+                        k.interestOps(ops or SelectionKey.OP_READ)
+                    } catch (_: Exception) {}
+                }
+            }
         }
     }
 
@@ -1290,7 +1431,10 @@ class VpnWorker(private val vpnService: VpnService) {
         return cachedIsWifi
     }
 
-    private fun isAppBlockedByFirewall(pkg: String): Boolean {
+    private fun isAppBlockedByFirewall(pkg: String?): Boolean {
+        if (pkg == null) {
+            return firewallBlockAll
+        }
         val isWifi = isWifiConnected()
         if (firewallBlockAll) {
             val isAllowed = firewallAllowedApps.contains(pkg)

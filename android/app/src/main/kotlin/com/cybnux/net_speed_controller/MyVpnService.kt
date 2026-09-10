@@ -14,8 +14,10 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
 import java.io.FileDescriptor
 import java.io.IOException
+import java.net.Inet6Address
 
 data class VpnStats(
     val downloadBps: Long,
@@ -152,9 +154,6 @@ class MyVpnService : VpnService() {
         fun buildStartIntentFromPrefs(context: Context): Intent? {
             return try {
                 val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
-                val vpnActive = prefs.getBoolean("vpn_active", false)
-                if (!vpnActive) return null
-
                 val downloadLimit = prefs.getLong("download_limit", 0L)
                 val uploadLimit = prefs.getLong("upload_limit", 0L)
                 val allowedApps = ArrayList(prefs.getStringSet("allowed_apps", emptySet()) ?: emptySet())
@@ -209,6 +208,12 @@ class MyVpnService : VpnService() {
             } catch (e: Exception) {
                 Log.e("MyVpnService", "Failed to build start intent from prefs: ${e.message}")
                 null
+            }
+        }
+
+        fun buildUpdateIntentFromPrefs(context: Context): Intent? {
+            return buildStartIntentFromPrefs(context)?.apply {
+                action = ACTION_UPDATE_SETTINGS
             }
         }
     }
@@ -425,6 +430,19 @@ class MyVpnService : VpnService() {
         dpiEnabled: Boolean = true,
         dnsRebindingProtection: Boolean = true
     ) {
+        if (isRunning && vpnInterface != null) {
+            Log.i(TAG, "VPN is already running; updating the existing worker")
+            vpnWorker?.updateWorkerSettings(
+                downloadLimit, uploadLimit, allowedApps, blockedAppsWifi, blockedAppsData,
+                blockAllFirewall, allowedFirewallApps,
+                dnsAdBlock, dnsAdultBlock, dnsSocialBlock, dnsCustomBlocked,
+                dataCapBytes, dataCapAction,
+                schedEnabled, schedStartH, schedStartM, schedEndH, schedEndM,
+                ebpfEnabled, dpiEnabled, dnsRebindingProtection
+            )
+            return
+        }
+
         // 1. Create and show foreground notification
         val notification = getVpnNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -448,6 +466,21 @@ class MyVpnService : VpnService() {
             // IPv4 config
             builder.addAddress("10.0.0.1", 24)
             builder.addRoute("0.0.0.0", 0) // Route all IPv4 traffic
+            
+            // IPv6 config: only enable if the underlying physical network actually supports global IPv6.
+            // On IPv4-only networks (most mobile data carriers), routing ::/0 creates a blackhole
+            // causing apps to hang, retry endlessly, and waste cellular quota.
+            if (hasGlobalIpv6()) {
+                try {
+                    builder.addAddress("fd00::1", 128)
+                    builder.addRoute("::", 0)
+                    Log.i(TAG, "Native IPv6 supported on network; IPv6 route enabled")
+                } catch (e: Exception) {
+                    Log.w(TAG, "IPv6 route setup ignored: ${e.message}")
+                }
+            } else {
+                Log.i(TAG, "No native IPv6 on network; IPv6 route omitted to prevent connection retry loops")
+            }
             
             
             if (dnsServers.isNotEmpty()) {
@@ -509,6 +542,7 @@ class MyVpnService : VpnService() {
             }
             isRunning = true
             instance = this
+            setVpnActiveState(this, true)
             NetworkMonitorService.instance?.forceImmediateSpeedUpdate()
 
         } catch (e: Exception) {
@@ -555,6 +589,29 @@ class MyVpnService : VpnService() {
         NetworkMonitorService.instance?.updateNotification()
     }
 
+    fun getPerAppUsageMap(): Map<String, Long> {
+        return vpnWorker?.getPerAppUsageMap() ?: emptyMap()
+    }
+
+    private fun hasGlobalIpv6(): Boolean {
+        return try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val activeNet = cm.activeNetwork ?: return false
+                val lp = cm.getLinkProperties(activeNet) ?: return false
+                lp.linkAddresses.any { linkAddr ->
+                    val addr = linkAddr.address
+                    addr is Inet6Address && !addr.isAnyLocalAddress && !addr.isLinkLocalAddress &&
+                            !addr.isLoopbackAddress && !addr.isSiteLocalAddress && !addr.isMulticastAddress
+                }
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun stopVpn() {
         Log.i(TAG, "Stopping VPN Service...")
         isRunning = false
@@ -590,6 +647,7 @@ class MyVpnService : VpnService() {
         }
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         nm?.cancel(NOTIFICATION_ID)
+        setVpnActiveState(this, false)
         Log.i(TAG, "VPN Service fully stopped")
         NetworkMonitorService.instance?.forceImmediateSpeedUpdate()
         stopSelf()

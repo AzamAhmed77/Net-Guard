@@ -302,4 +302,35 @@ class StorageService {
       return null;
     }
   }
+
+  static const String _keyHotspotPort = 'cybnux_hotspot_port';
+  static const String _keyHotspotDlLimit = 'cybnux_hotspot_dl_limit';
+  static const String _keyHotspotUlLimit = 'cybnux_hotspot_ul_limit';
+
+  static Future<void> saveHotspotSettings({
+    required int port,
+    required int dlLimit,
+    required int ulLimit,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_keyHotspotPort, port);
+      await prefs.setInt(_keyHotspotDlLimit, dlLimit);
+      await prefs.setInt(_keyHotspotUlLimit, ulLimit);
+    } catch (_) {}
+  }
+
+  static Future<Map<String, int>> loadHotspotSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        'port': prefs.getInt(_keyHotspotPort) ?? 8282,
+        'dlLimit': prefs.getInt(_keyHotspotDlLimit) ?? -1,
+        'ulLimit': prefs.getInt(_keyHotspotUlLimit) ?? -1,
+      };
+    } catch (_) {
+      return {'port': 8282, 'dlLimit': -1, 'ulLimit': -1};
+    }
+  }
 }
+

@@ -21,6 +21,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import android.widget.RemoteViews
+import android.graphics.Color
 import java.util.Calendar
 import java.util.Locale
 
@@ -417,11 +418,11 @@ class NetworkMonitorService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
 
-        // 1. زر تشغيل / إيقاف الحماية (الـ VPN) مباشرة من الإشعار تم رفعه للمكان المحدد في الإشعار وحذف زر الإحصائيات
-        val toggleVpnIntent = Intent(this, NetworkMonitorService::class.java).apply {
-            action = ACTION_TOGGLE_VPN
+        // 1. زر تشغيل / إيقاف الحماية (الـ VPN) عبر BroadcastReceiver لضمان الاستجابة في الخلفية
+        val toggleVpnIntent = Intent(this, VpnActionReceiver::class.java).apply {
+            action = VpnActionReceiver.ACTION_TOGGLE_VPN
         }
-        val toggleVpnPendingIntent = PendingIntent.getService(
+        val toggleVpnPendingIntent = PendingIntent.getBroadcast(
             this, 101, toggleVpnIntent,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -429,6 +430,8 @@ class NetworkMonitorService : Service() {
         val remoteViews = RemoteViews(packageName, R.layout.notification_net_guard)
         remoteViews.setTextViewText(R.id.tv_notif_line1, line1)
         remoteViews.setTextViewText(R.id.tv_notif_line2, line2)
+        remoteViews.setTextColor(R.id.tv_notif_line1, Color.WHITE)
+        remoteViews.setTextColor(R.id.tv_notif_line2, Color.parseColor("#E0E0E0"))
 
         if (isVpnActive) {
             remoteViews.setTextViewText(R.id.btn_notif_vpn, if (isEn) "🛑 Stop" else "🛑 إيقاف")
@@ -446,7 +449,6 @@ class NetworkMonitorService : Service() {
             .setSmallIcon(R.drawable.ic_notification)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(remoteViews)
-            .setCustomBigContentView(remoteViews)
             .setContentIntent(contentPendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -456,28 +458,41 @@ class NetworkMonitorService : Service() {
 
     private fun toggleVpnProtection() {
         Log.i(TAG, "toggleVpnProtection triggered from notification action")
-        val mainActivity = MainActivity.instance
-        if (mainActivity != null) {
-            mainActivity.toggleVpnFromNative()
-        } else {
-            // إذا كان التطبيق مغلقاً تماماً في الذاكرة
+        try {
             if (MyVpnService.isRunning) {
+                // 1. Direct native stop without any delay
                 val stopIntent = Intent(this, MyVpnService::class.java).apply {
                     action = MyVpnService.ACTION_STOP
                 }
                 startService(stopIntent)
+                // Also notify Flutter UI if open
+                MainActivity.instance?.toggleVpnFromNative()
             } else {
-                // فتح التطبيق لتشغيل الـ VPN
-                val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    putExtra("auto_start_vpn", true)
+                // 2. Direct native start from saved preferences
+                val startIntent = MyVpnService.buildStartIntentFromPrefs(this)
+                if (startIntent != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(startIntent)
+                    } else {
+                        startService(startIntent)
+                    }
+                    // Also notify Flutter UI if open
+                    MainActivity.instance?.toggleVpnFromNative()
+                } else {
+                    // Fallback to opening the app if no settings saved yet
+                    val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        putExtra("auto_start_vpn", true)
+                    }
+                    if (openIntent != null) startActivity(openIntent)
                 }
-                if (openIntent != null) startActivity(openIntent)
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error toggling VPN from notification: ${e.message}")
         }
 
-        // تحديث الإشعار بعد التبديل
-        handler.postDelayed({ updateNotification() }, 600)
+        // Instant notification update
+        handler.postDelayed({ updateNotification(force = true) }, 200)
     }
 
     private fun formatSpeed(bps: Long): String {
