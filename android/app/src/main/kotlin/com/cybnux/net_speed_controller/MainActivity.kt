@@ -1277,6 +1277,27 @@ class MainActivity: FlutterActivity() {
                 "getHotspotIp" -> {
                     result.success(HotspotProxyServer.getHotspotIpAddress())
                 }
+                "getDeviceHotspotName" -> {
+                    try {
+                        var name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+                            Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)
+                        } else null
+                        if (name.isNullOrBlank()) {
+                            name = Settings.Secure.getString(contentResolver, "bluetooth_name")
+                        }
+                        if (name.isNullOrBlank()) {
+                            name = Settings.System.getString(contentResolver, "device_name")
+                        }
+                        if (name.isNullOrBlank()) {
+                            val manufacturer = Build.MANUFACTURER.replaceFirstChar { it.uppercase() }
+                            val model = Build.MODEL
+                            name = if (model.startsWith(manufacturer, ignoreCase = true)) model else "$manufacturer $model"
+                        }
+                        result.success(name ?: "NetGuard Hotspot")
+                    } catch (e: Exception) {
+                        result.success(Build.MODEL ?: "NetGuard Hotspot")
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }

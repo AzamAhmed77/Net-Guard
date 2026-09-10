@@ -403,5 +403,14 @@ class MethodChannelService {
       return '192.168.43.1';
     }
   }
+
+  static Future<String> getDeviceHotspotName() async {
+    try {
+      final String? name = await _channel.invokeMethod('getDeviceHotspotName');
+      return (name != null && name.trim().isNotEmpty) ? name.trim() : 'NetGuard Hotspot';
+    } catch (_) {
+      return 'NetGuard Hotspot';
+    }
+  }
 }
 

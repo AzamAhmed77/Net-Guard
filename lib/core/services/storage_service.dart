@@ -333,6 +333,32 @@ class StorageService {
     }
   }
 
+  static const String _keyHotspotSsid = 'cybnux_hotspot_ssid';
+  static const String _keyHotspotPassword = 'cybnux_hotspot_password';
+
+  static Future<void> saveHotspotWifiCredentials({
+    required String ssid,
+    required String password,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyHotspotSsid, ssid);
+      await prefs.setString(_keyHotspotPassword, password);
+    } catch (_) {}
+  }
+
+  static Future<Map<String, String>> loadHotspotWifiCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        'ssid': prefs.getString(_keyHotspotSsid) ?? '',
+        'password': prefs.getString(_keyHotspotPassword) ?? '',
+      };
+    } catch (_) {
+      return {'ssid': '', 'password': ''};
+    }
+  }
+
   static const String _keyScheduleEnabled = 'cybnux_schedule_enabled';
   static const String _keyScheduleStartH = 'cybnux_schedule_start_h';
   static const String _keyScheduleStartM = 'cybnux_schedule_start_m';

@@ -320,10 +320,24 @@ class AppStrings {
       ? '4. أدخل المضيف والمنفذ الموضحين أدناه ثم اضغط حفظ.'
       : '4. Enter the Host IP and Port shown below and tap Save.';
   String get hotspotQrCodeBtn => isAr ? 'عرض رمز QR للربط السريع' : 'Quick Connect QR Code';
-  String get hotspotQrDialogTitle => isAr ? 'رمز QR لإعدادات البروكسي' : 'Proxy Settings QR Code';
+  String get hotspotQrDialogTitle => isAr ? 'رمز QR للمشاركة والربط السريع' : 'Hotspot Sharing & QR';
   String get hotspotQrDialogSubtitle => isAr
       ? 'امسح الرمز بكاميرا الجهاز الآخر لنسخ وحفظ إعدادات البروكسي فوراً:'
       : 'Scan this code with another device to quickly copy proxy settings:';
+  String get hotspotTabWifi => isAr ? 'اتصال واي فاي فوري 📶' : 'Wi-Fi Connect 📶';
+  String get hotspotTabProxy => isAr ? 'إعدادات البروكسي 🛡️' : 'Proxy Settings 🛡️';
+  String get hotspotWifiQrSubtitle => isAr
+      ? 'امسح الرمز بكاميرا أي هاتف للاتصال بنقطة اتصالك تلقائياً وبسرعة فائقة!'
+      : 'Scan this QR code with any phone camera to instantly connect to your hotspot!';
+  String get hotspotSsidLabel => isAr ? 'اسم الشبكة (SSID)' : 'Network Name (SSID)';
+  String get hotspotPasswordLabel => isAr ? 'كلمة المرور' : 'Password';
+  String get hotspotNoPassword => isAr ? 'شبكة مفتوحة (بدون كلمة سر)' : 'Open Network (No Password)';
+  String get hotspotEditCredentials => isAr ? 'تعديل بيانات البث' : 'Edit Hotspot Info';
+  String get hotspotSaveCredentials => isAr ? 'حفظ وتحديث الرمز' : 'Save & Update QR';
+  String get hotspotCredentialsSaved => isAr ? 'تم تحديث بيانات البث ورمز QR بنجاح ✅' : 'Hotspot info and QR updated successfully ✅';
+  String get hotspotProxyGuideTip => isAr
+      ? 'لتطبيق قيود السرعة على الجهاز المتصل، افتح إعدادات Wi-Fi في جهازه واختر: خيارات متقدمة > البروكسي > يدوي، وأدخل العنوان أدناه.'
+      : 'To apply speed limits to the connected device, open its Wi-Fi settings: Advanced > Proxy > Manual, and enter the address below.';
 
   // ── Smart Automation & Scheduling ──
   String get scheduleSection => isAr ? 'الجدولة التلقائية الذكية' : 'SMART AUTOMATION & SCHEDULE';
