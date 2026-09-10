@@ -1,0 +1,45 @@
+Categories:
+  - Security
+  - Internet
+License: GPL-3.0-or-later
+AuthorName: Azam Ahmed
+AuthorEmail: AzamAhemdAli2@gmail.com
+SourceCode: https://github.com/AzamAhmed77/Net-Guard
+IssueTracker: https://github.com/AzamAhmed77/Net-Guard/issues
+Changelog: https://github.com/AzamAhmed77/Net-Guard/releases
+
+AutoName: Net Guard
+Summary: Per-app speed limiter, smart firewall, encrypted DoH DNS & hotspot controller
+Description: |-
+  Net Guard is an advanced network traffic controller, on-device firewall,
+  and data saver for Android. It operates completely on-device without root.
+
+  Key Features:
+  * Per-app bandwidth rate limiting (Token-Bucket algorithm)
+  * On-device firewall for Wi-Fi and Mobile data
+  * Encrypted DNS-over-HTTPS (DoH) with Cloudflare, AdGuard, Google
+  * Advanced IPv6 leak protection & AAAA resolution
+  * Hotspot tethering speed controller via local proxy
+  * Live status bar network speed notification (works without VPN)
+  * Privacy-first design with 100% on-device processing
+
+RepoType: git
+Repo: https://github.com/AzamAhmed77/Net-Guard.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: .
+    output: build/app/outputs/flutter-apk/app-release.apk
+    srclibs:
+      - flutter@stable
+    prebuild:
+      - $$flutter$$/bin/flutter pub get
+    build:
+      - $$flutter$$/bin/flutter build apk --release
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1

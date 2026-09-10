@@ -1,0 +1,10 @@
+Net Guard is an advanced network traffic controller, on-device firewall, and bandwidth manager for Android.
+
+Key Features:
+* Per-App Speed Throttling: Regulate upload and download bandwidth per application using a high-precision token-bucket algorithm without root.
+* Smart On-Device Firewall: Restrict or allow apps on Wi-Fi and Mobile Data independently.
+* Encrypted DNS-over-HTTPS (DoH): Secure DNS lookups with Cloudflare, AdGuard, or Google to prevent ISP eavesdropping and tampering.
+* Advanced IPv6 Leak Protection: Block unexpected IPv6 leakages and synthesize NODATA responses for fast fallback.
+* Hotspot Speed Controller: Share internet with tethered guest devices while limiting their speed through an on-device proxy server with quick QR setup.
+* Live Network Monitor Notification: Real-time speed and daily consumption in the status bar without requiring a continuous VPN.
+* Privacy-First & Zero-Root: 100% on-device processing. No logs, no third-party trackers, no remote analytics.

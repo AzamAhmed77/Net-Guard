@@ -1,0 +1,1 @@
+Per-app speed limiter, smart firewall, encrypted DoH DNS & hotspot controller.
