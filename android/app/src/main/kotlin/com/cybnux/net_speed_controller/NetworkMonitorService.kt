@@ -20,6 +20,7 @@ import android.os.HandlerThread
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import android.content.res.Configuration
 import android.widget.RemoteViews
 import android.graphics.Color
 import java.util.Calendar
@@ -430,8 +431,12 @@ class NetworkMonitorService : Service() {
         val remoteViews = RemoteViews(packageName, R.layout.notification_net_guard)
         remoteViews.setTextViewText(R.id.tv_notif_line1, line1)
         remoteViews.setTextViewText(R.id.tv_notif_line2, line2)
-        remoteViews.setTextColor(R.id.tv_notif_line1, Color.WHITE)
-        remoteViews.setTextColor(R.id.tv_notif_line2, Color.parseColor("#E0E0E0"))
+
+        val isNightMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val primaryColor = if (isNightMode) Color.WHITE else Color.parseColor("#111111")
+        val secondaryColor = if (isNightMode) Color.parseColor("#E0E0E0") else Color.parseColor("#555555")
+        remoteViews.setTextColor(R.id.tv_notif_line1, primaryColor)
+        remoteViews.setTextColor(R.id.tv_notif_line2, secondaryColor)
 
         if (isVpnActive) {
             remoteViews.setTextViewText(R.id.btn_notif_vpn, if (isEn) "🛑 Stop" else "🛑 إيقاف")

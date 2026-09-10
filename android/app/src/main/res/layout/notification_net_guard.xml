@@ -40,7 +40,7 @@
         android:layout_centerVertical="true"
         android:orientation="vertical">
 
-        <!-- Line 1: Download & Upload Speeds (Pure High-Contrast White) -->
+        <!-- Line 1: Download & Upload Speeds (System Adaptive) -->
         <TextView
             android:id="@+id/tv_notif_line1"
             android:layout_width="wrap_content"
@@ -48,14 +48,14 @@
             android:includeFontPadding="false"
             android:padding="0dp"
             android:text="↓ 0.0 KB/s    •    ↑ 0.0 KB/s"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/notif_text_primary"
             android:textSize="13.5sp"
             android:textStyle="bold"
             android:textDirection="locale"
             android:singleLine="true"
             android:ellipsize="end" />
 
-        <!-- Line 2: WiFi & Mobile Data Usage (Bright High-Contrast Silver White) -->
+        <!-- Line 2: WiFi & Mobile Data Usage (System Adaptive) -->
         <TextView
             android:id="@+id/tv_notif_line2"
             android:layout_width="wrap_content"
@@ -64,7 +64,7 @@
             android:includeFontPadding="false"
             android:padding="0dp"
             android:text="واي فاي: 0.0 MB   •   بيانات: 0.0 MB"
-            android:textColor="#E0E0E0"
+            android:textColor="@color/notif_text_secondary"
             android:textSize="11sp"
             android:textDirection="locale"
             android:singleLine="true"

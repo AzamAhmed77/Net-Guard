@@ -301,5 +301,23 @@ class AppStrings {
   String get hotspotSetupIos => isAr ? 'آيفون / آيباد (iOS)' : 'iPhone / iPad';
   String get hotspotSetupPc => isAr ? 'كمبيوتر (Windows / Mac)' : 'PC (Windows / Mac)';
   String get hotspotCopySuccess => isAr ? 'تم نسخ بيانات الاتصال إلى الحافظة' : 'Connection details copied to clipboard';
+  String get hotspotIndependentNote => isAr
+      ? 'ميزة اختيارية منفصلة: تعمل بمفردها ولا تتدخل في حماية VPN للهاتف.'
+      : 'Independent optional feature: Runs on its own without affecting phone VPN protection.';
+  String get hotspotGuideIntro => isAr
+      ? 'لتقييد سرعة الأجهزة المتصلة ببث هاتفك، يتم ضبط الوكيل (Proxy) في الجهاز الآخر كالتالي:'
+      : 'To throttle connected devices, configure the Wi-Fi proxy on the other device as follows:';
+  String get hotspotGuideStep1 => isAr
+      ? '1. قم بتشغيل نقطة الاتصال (Hotspot) العادية من هاتفك.'
+      : '1. Turn on normal Mobile Hotspot on your phone.';
+  String get hotspotGuideStep2 => isAr
+      ? '2. اختر السرعة المطلوبة للأجهزة المتصلة من هنا.'
+      : '2. Select the desired speed limit for connected devices from here.';
+  String get hotspotGuideStep3 => isAr
+      ? '3. في الجهاز المتصل: ادخل إعدادات Wi-Fi > خيارات متقدمة > الوكيل (Proxy) > يدوي (Manual).'
+      : '3. On connected device: Go to Wi-Fi settings > Advanced > Proxy > Manual.';
+  String get hotspotGuideStep4 => isAr
+      ? '4. أدخل المضيف والمنفذ الموضحين أدناه ثم اضغط حفظ.'
+      : '4. Enter the Host IP and Port shown below and tap Save.';
 }
 

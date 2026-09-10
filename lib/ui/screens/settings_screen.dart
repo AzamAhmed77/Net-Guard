@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/themes/app_colors.dart';
 import '../../core/localization/app_strings.dart';
@@ -269,11 +270,34 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.wifi_tethering_rounded,
                 title: strings.hotspotControllerTitle,
                 subtitle: vpn.isHotspotRunning
-                    ? (vpn.isArabic ? 'الخدمة تعمل 🟢' : 'Service ON 🟢')
-                    : (vpn.isArabic ? 'الخدمة متوقفة ⚪' : 'Service OFF ⚪'),
+                    ? (vpn.isArabic ? 'الخدمة تعمل 🟢 (مستقلة عن VPN)' : 'Service ON 🟢 (Independent)')
+                    : (vpn.isArabic ? 'الخدمة متوقفة ⚪ (ميزة اختيارية منفصلة)' : 'Service OFF ⚪ (Optional)'),
                 value: vpn.isHotspotRunning,
                 onChanged: (_) => vpn.toggleHotspotProxy(),
               ),
+              if (vpn.isHotspotRunning) ...[
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: AppColors.accent, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          strings.hotspotIndependentNote,
+                          style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Divider(color: AppColors.borderDark, height: 1),
               Padding(
                 padding: const EdgeInsets.all(14),
@@ -281,7 +305,7 @@ class SettingsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      vpn.isArabic ? 'تحديد سرعة البث:' : 'Select Speed Limit:',
+                      vpn.isArabic ? 'تحديد سرعة البث للأجهزة المتصلة:' : 'Select Speed Limit for Devices:',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -304,6 +328,20 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              const Divider(color: AppColors.borderDark, height: 1),
+              ListTile(
+                leading: Icon(Icons.help_outline_rounded, color: AppColors.accent, size: 20),
+                title: Text(
+                  strings.hotspotSetupGuide,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                ),
+                subtitle: Text(
+                  vpn.isArabic ? 'اضغط لعرض خطوات ربط الأجهزة بالبروكسي' : 'Tap to view proxy setup guide',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
+                onTap: () => _showHotspotGuideDialog(context, strings, vpn),
               ),
             ],
           ),
@@ -719,6 +757,138 @@ class SettingsScreen extends StatelessWidget {
           vpn.setHotspotLimits(downloadKbps: kbps, uploadKbps: kbps);
         }
       },
+    );
+  }
+
+  void _showHotspotGuideDialog(BuildContext context, AppStrings strings, VpnManager vpn) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceCardDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.borderDark),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.wifi_tethering_rounded, color: AppColors.accent, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                strings.hotspotSetupGuide,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                strings.hotspotGuideIntro,
+                style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 14),
+              _buildGuideStep(strings.hotspotGuideStep1),
+              const SizedBox(height: 8),
+              _buildGuideStep(strings.hotspotGuideStep2),
+              const SizedBox(height: 8),
+              _buildGuideStep(strings.hotspotGuideStep3),
+              const SizedBox(height: 8),
+              _buildGuideStep(strings.hotspotGuideStep4),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.bgDark,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.borderDark),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${strings.hotspotIpLabel} 192.168.43.1',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${strings.hotspotPortLabel} 8282',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.copy, color: AppColors.accent, size: 20),
+                      tooltip: 'نسخ',
+                      onPressed: () {
+                        Clipboard.setData(const ClipboardData(text: '192.168.43.1:8282'));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(strings.hotspotCopySuccess),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.amber, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        strings.hotspotIndependentNote,
+                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              strings.close,
+              style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildGuideStep(String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.check_circle_outline, color: AppColors.accent, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+          ),
+        ),
+      ],
     );
   }
 }
