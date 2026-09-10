@@ -1,17 +1,147 @@
-# net_speed_controller
+# 🛡️ Net Guard — حارس الإنترنت ومتحكم السرعة الذكي
+### Advanced Network Traffic Controller, Firewall & Data Saver for Android
 
-A new Flutter project.
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 📖 نبذة عن التطبيق | Overview
 
-A few resources to get you started if this is your first Flutter project:
+**Net Guard (حارس الإنترنت)** هو تطبيق متكامل وقوي لنظام أندرويد مصمم للتحكم الكامل في حركة البيانات والإنترنت داخل هاتفك. يجمع التطبيق بين **جدار حماية ذكي (Firewall)**، **محدد سرعة فائق الدقة (Bandwidth Throttler)**، **متحكم سرعة بث نقطة الاتصال (Hotspot Speed Controller)**، و**نظام مراقبة استهلاك الباقة الشهرية**، كل ذلك بدون الحاجة إلى صلاحيات الروت (**No Root Required**) وبأعلى معايير الحفاظ على شحن البطارية.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## ✨ المميزات الرئيسية | Key Features
+
+### 1. 🛡️ جدار حماية ذكي لكل تطبيق (Per-App Firewall)
+- **حظر شامل أو مخصص:** إمكانية قطع الإنترنت تماماً أو السماح به لتطبيقات محددة بنقرة واحدة.
+- **فصل شبكة الواي فاي عن شريحة البيانات:** تحكم مستقل في وصول كل تطبيق لشبكة Wi-Fi أو بيانات الهاتف (Mobile Data).
+- **العزل التلقائي للتطبيقات الجديدة (Auto Quarantine):** وضع أي تطبيق يتم تثبيته حديثاً في الحجر الصحي فوراً لمنعه من استنزاف الرصيد في الخلفية قبل موافقتك.
+- **حظر الإنترنت عند قفل الشاشة (Lockdown on Screen Off):** قطع الاتصال عن التطبيقات غير الضرورية بمجرد إغلاق الشاشة لتوفير البطارية ومنع التحديثات المباغتة.
+
+### 2. ⚡ تحكم دقيق ومتقدم في سرعة الإنترنت (Bandwidth Throttling)
+- تحديد السرعة القصوى للتحميل (Download) والرفع (Upload) على مستوى الهاتف أو لكل تطبيق على حدة.
+- أوضاع سرعة سريعة جاهزة:
+  - **وضع التوفير (Eco Mode):** مثالي للرسائل النصية والدردشة مع أقل استهلاك للباقة.
+  - **الوضع العادي (Normal Mode):** تصفح متوازن بدون استهلاك مفرط.
+  - **الوضع المفتوح (Unlimited):** سرعة الشبكة القصوى عند الحاجة.
+- محرك خنق حركة البيانات المعتمد على خوارزمية **Token-Bucket** الرياضية لضمان تدفق سلس للبيانات دون تقطيع الاتصال.
+
+### 3. 📡 متحكم سرعة بث نقطة الاتصال (Hotspot Speed Controller)
+- **تقييد سرعة الأجهزة المتصلة:** حماية باقة هاتفك عند مشاركة الإنترنت مع الآخرين.
+- **خيارات سرعة متعددة تشمل:**
+  - **`64 KB/s` (توفير فائق):** كافٍ لرسائل الواتساب والتصفح الخفيف جداً ويمنع الفيديوهات الثقيلة.
+  - `128 KB/s` - `256 KB/s` - `512 KB/s` - `1 MB/s` - `2 MB/s` - `مفتوح (∞)`.
+- **خادم وسيط محلي متطور (High-Performance Local Proxy Server):** يعمل على المنفذ `8282` ويعمل بشكل مستقل تماماً عن حماية الهاتف الخاصة بـ VPN.
+- دليل إعداد سريع مدمج يوضح بالخطوات كيفية ربط الأجهزة المتصلة بالبروكسي في ثوانٍ معدودة.
+
+### 4. 🔔 شريط إشعارات حي ذكي ومتكيف (Adaptive Live Notification)
+- يعرض سرعة التحميل والرفع اللحظية واستهلاك اليوم لشبكة الواي فاي والبيانات.
+- **تكيف تلقائي للألوان:**
+  - نصوص سوداء واضحة (`#111111`) عالية التباين في **الوضع الفاتح (النهاري)**.
+  - نصوص بيضاء ناصعة (`#FFFFFF`) في **الوضع المظلم (الليلي)**.
+- تصميم مضغوط وأنيق خالي من الفراغات الزائدة مع زر مدمج سريع لتشغيل أو إيقاف الحماية (`⚡ تشغيل` / `🛑 إيقاف`).
+
+### 5. 🔒 خوادم DNS مشفرة وحماية عائلية (Encrypted DNS & Content Filtering)
+- دعم خوادم DNS الآمنة والموثوقة عالمياً:
+  - **Cloudflare DNS (`1.1.1.1`):** أسرع استجابة مع تشفير وحماية الخصوصية.
+  - **AdGuard DNS (`94.140.14.14`):** حجب تلقائي للإعلانات والتعقب والمواقع الخبيثة.
+  - **Google Public DNS (`8.8.8.8`):** موثوقية واستقرار فائق.
+- إمكانية تفعيل **الحماية العائلية (Family Shield)** لحظر المحتوى غير المناسب.
+
+### 6. 📊 إدارة باقة البيانات الشهرية والتنبيهات (Data Plan & Spike Monitor)
+- تتبع حجم الاستهلاك من الباقة الشهرية وتحديد يوم تجديد الباقة مع عداد تنازلي للمتبقي.
+- إجراءات ذكية تلقائية عند نفاد أو تجاوز حد الباقة (تقييد السرعة أو فصل النت).
+- **كاشف النزيف السري للبيانات (Data Spike Alert):** ينبهك فوراً إذا بدأ أي تطبيق باستهلاك غير طبيعي ومفاجئ للبيانات في الخلفية.
+
+### 7. 🔋 كفاءة قصوى للبطارية ودعم وضع السكون (Battery Optimization)
+- صُممت الخدمات الخلفية لتدخل في وضع السكون العميق (**Deep Sleep**) فور إغلاق الشاشة.
+- استخدام مؤقتات غير متزامنة خفيفة جداً تمنع ارتفاع حرارة المعالج أو استنزاف البطارية.
+
+---
+
+## 🏗️ المعمارية التقنية | Technical Architecture
+
+تم بناء التطبيق وفق معمارية هجينة تجمع بين واجهة فلاتر العصرية وسرعة نواة أندرويد بلغة كوتلن:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 Flutter Presentation Layer                  │
+│       (Provider State Management + Modern Matte Theme)      │
+│  - DashboardTab         - FirewallTab        - Settings     │
+│  - UsageHistoryTab      - DnsSecurityTab     - HotspotModal │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ MethodChannel Bridge
+┌──────────────────────────────▼──────────────────────────────┐
+│                    Android Native Engine                    │
+│                      (Kotlin Coroutines)                    │
+│  ┌─────────────────────────┐   ┌──────────────────────────┐ │
+│  │     MyVpnService        │   │  NetworkMonitorService   │ │
+│  │ (VPN Tunnel & Firewall) │   │ (Speed & Live Notif)     │ │
+│  └─────────────────────────┘   └──────────────────────────┘ │
+│  ┌─────────────────────────┐   ┌──────────────────────────┐ │
+│  │   HotspotProxyServer    │   │      PackageReceiver     │ │
+│  │ (Rate-Limited Tethering)│   │ (Auto Quarantine Engine) │ │
+│  └─────────────────────────┘   └──────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🚀 طريقة التثبيت والتشغيل | How to Build & Run
+
+### المتطلبات الأساسية:
+- **Flutter SDK:** الإصدار `3.24.x` أو أحدث.
+- **Android Studio / Android SDK:** API 24 (Android 7.0) فما فوق (موصى به API 34).
+- **Java JDK:** إصدار 17.
+
+### خطوات التجميع والتثبيت:
+
+1. **استنساخ المستودع (Clone the Repository):**
+   ```bash
+   git clone https://github.com/AzamAhmed77/Net-Guard.git
+   cd Net-Guard
+   ```
+
+2. **تنزيل الحزم والمكتبات (Get Dependencies):**
+   ```bash
+   flutter pub get
+   ```
+
+3. **فحص الكود والتأكد من خلوه من الأخطاء (Analyze):**
+   ```bash
+   flutter analyze
+   ```
+
+4. **بناء نسخة الـ APK المحسنة (Build Release APK):**
+   ```bash
+   flutter build apk --split-per-abi
+   ```
+   *ستجد ملفات الـ APK الجاهزة داخل المجلد:*
+   `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
+
+5. **تثبيت التطبيق على هاتفك عبر ADB:**
+   ```bash
+   adb install -r -d build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+   ```
+
+---
+
+## 📱 الأذونات المطلوبة وسبب طلبها | Permissions
+
+| الإذن | السبب والغرض |
+| :--- | :--- |
+| `BIND_VPN_SERVICE` | إنشاء نفق VPN محلي لتصفية وتحديد سرعة حزم البيانات دون خروجها من جهازك. |
+| `PACKAGE_USAGE_STATS` | قراءة استهلاك كل تطبيق للبيانات لعرض الإحصائيات الدقيقة للمستخدم. |
+| `POST_NOTIFICATIONS` | إظهار عداد السرعة الحي والاستهلاك في شريط الإشعارات بنظام أندرويد 13+. |
+| `FOREGROUND_SERVICE` | استمرار المراقبة اللحظية للشبكة وحماية الباقة في الخلفية دون أن يغلقها النظام. |
+| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | ضمان استقرار خدمة جدار الحماية وعدم قتلها بواسطة موفر البطارية. |
+
+---
+
+## 📄 الترخيص | License
+
+هذا المشروع مرخص تحت رخصة **MIT License** — راجع ملف [LICENSE](LICENSE) لمزيد من التفاصيل.
