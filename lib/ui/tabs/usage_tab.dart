@@ -5,6 +5,7 @@ import '../../core/models/app_info.dart';
 import '../../core/themes/app_colors.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/services/method_channel_service.dart';
+import '../widgets/usage_donut_chart.dart';
 
 class UsageTab extends StatefulWidget {
   const UsageTab({super.key});
@@ -750,6 +751,16 @@ class _UsageTabState extends State<UsageTab> {
               backgroundColor: Colors.transparent,
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
             ),
+          ),
+
+        // ==========================================
+        // USAGE DONUT CHART ANALYTICS
+        // ==========================================
+        if (_searchQuery.isEmpty)
+          UsageDonutChart(
+            usageList: usageList,
+            totalUsage: totalUsage,
+            strings: strings,
           ),
 
         // ==========================================

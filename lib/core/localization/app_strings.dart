@@ -319,5 +319,28 @@ class AppStrings {
   String get hotspotGuideStep4 => isAr
       ? '4. أدخل المضيف والمنفذ الموضحين أدناه ثم اضغط حفظ.'
       : '4. Enter the Host IP and Port shown below and tap Save.';
+  String get hotspotQrCodeBtn => isAr ? 'عرض رمز QR للربط السريع' : 'Quick Connect QR Code';
+  String get hotspotQrDialogTitle => isAr ? 'رمز QR لإعدادات البروكسي' : 'Proxy Settings QR Code';
+  String get hotspotQrDialogSubtitle => isAr
+      ? 'امسح الرمز بكاميرا الجهاز الآخر لنسخ وحفظ إعدادات البروكسي فوراً:'
+      : 'Scan this code with another device to quickly copy proxy settings:';
+
+  // ── Smart Automation & Scheduling ──
+  String get scheduleSection => isAr ? 'الجدولة التلقائية الذكية' : 'SMART AUTOMATION & SCHEDULE';
+  String get scheduleEnableTitle => isAr ? 'تفعيل الجدولة الزمنية' : 'Enable Scheduled Rules';
+  String get scheduleEnableDesc => isAr
+      ? 'تطبيق قيود سرعة أو إغلاق تلقائي خلال ساعات محددة يومياً (مثل وقت النوم)'
+      : 'Auto-apply speed limits or lockdown during daily hours (e.g. bedtime)';
+  String get scheduleStartTime => isAr ? 'وقت البدء' : 'Start Time';
+  String get scheduleEndTime => isAr ? 'وقت الانتهاء' : 'End Time';
+  String get scheduleAction => isAr ? 'نوع الإجراء التلقائي' : 'Scheduled Action';
+  String get scheduleActionEco => isAr ? 'وضع التوفير الليلي (64 KB/s)' : 'Night Eco Mode (64 KB/s)';
+  String get scheduleActionLockdown => isAr ? 'وضع الإغلاق التام (قطع النت)' : 'Lockdown Mode (Block All)';
+  String get scheduleStatusActive => isAr ? 'الجدولة التلقائية مطبقة الآن ⚡' : 'Schedule is currently active ⚡';
+
+  // ── Usage Donut Chart ──
+  String get usageChartTitle => isAr ? 'توزيع استهلاك الباقة' : 'Data Usage Breakdown';
+  String get otherApps => isAr ? 'تطبيقات أخرى' : 'Other Apps';
+  String get totalUsageCenter => isAr ? 'الإجمالي' : 'Total';
 }
 

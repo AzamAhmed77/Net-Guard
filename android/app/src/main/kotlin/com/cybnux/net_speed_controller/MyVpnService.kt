@@ -146,6 +146,8 @@ class MyVpnService : VpnService() {
             try {
                 val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
                 prefs.edit().putBoolean("vpn_active", active).apply()
+                NetGuardTileService.requestTileUpdate(context)
+                NetGuardWidgetProvider.updateAllWidgets(context)
             } catch (e: Exception) {
                 Log.e("MyVpnService", "Failed to set vpn active state: ${e.message}")
             }

@@ -61,6 +61,8 @@ class VpnActionReceiver : BroadcastReceiver() {
             Handler(Looper.getMainLooper()).postDelayed({
                 NetworkMonitorService.instance?.updateNotification(force = true)
                 MainActivity.instance?.syncVpnStateFromNative()
+                NetGuardTileService.requestTileUpdate(context)
+                NetGuardWidgetProvider.updateAllWidgets(context)
             }, 300)
         }
     }

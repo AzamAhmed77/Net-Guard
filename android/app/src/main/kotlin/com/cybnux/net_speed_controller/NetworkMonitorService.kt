@@ -231,6 +231,7 @@ class NetworkMonitorService : Service() {
             queryTodayUsage()
             lastUsageQueryMs = now
             checkDataSpike(now)
+            NetGuardWidgetProvider.updateAllWidgets(this)
         }
 
         // 3. تحديث الإشعار الذكي (يحدث فقط عند تغير المحتوى لتبريد المعالج)

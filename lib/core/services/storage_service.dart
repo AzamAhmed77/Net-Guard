@@ -332,5 +332,54 @@ class StorageService {
       return {'port': 8282, 'dlLimit': -1, 'ulLimit': -1};
     }
   }
+
+  static const String _keyScheduleEnabled = 'cybnux_schedule_enabled';
+  static const String _keyScheduleStartH = 'cybnux_schedule_start_h';
+  static const String _keyScheduleStartM = 'cybnux_schedule_start_m';
+  static const String _keyScheduleEndH = 'cybnux_schedule_end_h';
+  static const String _keyScheduleEndM = 'cybnux_schedule_end_m';
+  static const String _keyScheduleAction = 'cybnux_schedule_action';
+
+  static Future<void> saveScheduleSettings({
+    required bool enabled,
+    required int startHour,
+    required int startMinute,
+    required int endHour,
+    required int endMinute,
+    required String action,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyScheduleEnabled, enabled);
+      await prefs.setInt(_keyScheduleStartH, startHour);
+      await prefs.setInt(_keyScheduleStartM, startMinute);
+      await prefs.setInt(_keyScheduleEndH, endHour);
+      await prefs.setInt(_keyScheduleEndM, endMinute);
+      await prefs.setString(_keyScheduleAction, action);
+    } catch (_) {}
+  }
+
+  static Future<Map<String, dynamic>> loadScheduleSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        'enabled': prefs.getBool(_keyScheduleEnabled) ?? false,
+        'startHour': prefs.getInt(_keyScheduleStartH) ?? 0,
+        'startMinute': prefs.getInt(_keyScheduleStartM) ?? 0,
+        'endHour': prefs.getInt(_keyScheduleEndH) ?? 6,
+        'endMinute': prefs.getInt(_keyScheduleEndM) ?? 0,
+        'action': prefs.getString(_keyScheduleAction) ?? 'eco',
+      };
+    } catch (_) {
+      return {
+        'enabled': false,
+        'startHour': 0,
+        'startMinute': 0,
+        'endHour': 6,
+        'endMinute': 0,
+        'action': 'eco',
+      };
+    }
+  }
 }
 

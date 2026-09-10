@@ -8,6 +8,7 @@ import 'permissions_modal.dart';
 import 'about_modal.dart';
 import 'expert_settings_modal.dart';
 import 'live_logs_modal.dart';
+import '../widgets/hotspot_qr_dialog.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -331,6 +332,20 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(color: AppColors.borderDark, height: 1),
               ListTile(
+                leading: Icon(Icons.qr_code_2_rounded, color: AppColors.accent, size: 20),
+                title: Text(
+                  strings.hotspotQrCodeBtn,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                ),
+                subtitle: Text(
+                  vpn.isArabic ? 'مسح سريع لربط أجهزة الضيوف تلقائياً' : 'Quick scan to connect guest devices',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
+                onTap: () => showHotspotQrDialog(context, strings),
+              ),
+              const Divider(color: AppColors.borderDark, height: 1),
+              ListTile(
                 leading: Icon(Icons.help_outline_rounded, color: AppColors.accent, size: 20),
                 title: Text(
                   strings.hotspotSetupGuide,
@@ -343,6 +358,126 @@ class SettingsScreen extends StatelessWidget {
                 trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
                 onTap: () => _showHotspotGuideDialog(context, strings, vpn),
               ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // ==========================================
+          // 4.5. SMART AUTOMATION & SCHEDULE
+          // ==========================================
+          _buildSectionHeader(strings.scheduleSection),
+          _buildCard(
+            children: [
+              SwitchListTile.adaptive(
+                secondary: Icon(
+                  Icons.schedule_rounded,
+                  color: vpn.isScheduleEnabled ? AppColors.accent : AppColors.textSecondary,
+                  size: 22,
+                ),
+                title: Text(
+                  strings.scheduleEnableTitle,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                ),
+                subtitle: Text(
+                  strings.scheduleEnableDesc,
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+                value: vpn.isScheduleEnabled,
+                activeTrackColor: AppColors.accent,
+                onChanged: (val) {
+                  vpn.updateScheduleSettings(enabled: val);
+                },
+              ),
+              if (vpn.isScheduleEnabled) ...[
+                if (vpn.isScheduleCurrentlyActive) ...[
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.bolt_rounded, color: AppColors.accent, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            strings.scheduleStatusActive,
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const Divider(color: AppColors.borderDark, height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTimePickerTile(
+                              context: context,
+                              label: strings.scheduleStartTime,
+                              hour: vpn.scheduleStartHour,
+                              minute: vpn.scheduleStartMinute,
+                              isAr: vpn.isArabic,
+                              onTimePicked: (h, m) {
+                                vpn.updateScheduleSettings(startHour: h, startMinute: m);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildTimePickerTile(
+                              context: context,
+                              label: strings.scheduleEndTime,
+                              hour: vpn.scheduleEndHour,
+                              minute: vpn.scheduleEndMinute,
+                              isAr: vpn.isArabic,
+                              onTimePicked: (h, m) {
+                                vpn.updateScheduleSettings(endHour: h, endMinute: m);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        strings.scheduleAction,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildScheduleActionOption(
+                              label: strings.scheduleActionEco,
+                              icon: Icons.eco_rounded,
+                              isSelected: vpn.scheduleAction == 'eco',
+                              onTap: () => vpn.updateScheduleSettings(action: 'eco'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildScheduleActionOption(
+                              label: strings.scheduleActionLockdown,
+                              icon: Icons.lock_outline_rounded,
+                              isSelected: vpn.scheduleAction == 'lockdown',
+                              onTap: () => vpn.updateScheduleSettings(action: 'lockdown'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 20),
@@ -823,18 +958,27 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: Icon(Icons.copy, color: AppColors.accent, size: 20),
-                      tooltip: 'نسخ',
-                      onPressed: () {
-                        Clipboard.setData(const ClipboardData(text: '192.168.43.1:8282'));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(strings.hotspotCopySuccess),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.qr_code_2_rounded, color: AppColors.accent, size: 22),
+                          tooltip: strings.hotspotQrCodeBtn,
+                          onPressed: () => showHotspotQrDialog(context, strings),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.copy, color: AppColors.accent, size: 20),
+                          tooltip: 'نسخ',
+                          onPressed: () {
+                            Clipboard.setData(const ClipboardData(text: '192.168.43.1:8282'));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(strings.hotspotCopySuccess),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -889,6 +1033,93 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTimePickerTile({
+    required BuildContext context,
+    required String label,
+    required int hour,
+    required int minute,
+    required bool isAr,
+    required void Function(int hour, int minute) onTimePicked,
+  }) {
+    final time = TimeOfDay(hour: hour, minute: minute);
+    final formattedTime = time.format(context);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () async {
+        final picked = await showTimePicker(
+          context: context,
+          initialTime: time,
+        );
+        if (picked != null) {
+          onTimePicked(picked.hour, picked.minute);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.bgDark,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.borderDark),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  formattedTime,
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.accent),
+                ),
+                const Icon(Icons.access_time_rounded, size: 16, color: AppColors.textSecondary),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleActionOption({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accent.withValues(alpha: 0.15) : AppColors.bgDark,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? AppColors.accent : AppColors.borderDark,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: isSelected ? AppColors.accent : AppColors.textSecondary),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

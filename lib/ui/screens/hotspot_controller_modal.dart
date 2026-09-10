@@ -5,6 +5,7 @@ import '../../core/managers/vpn_manager.dart';
 import '../../core/themes/app_colors.dart';
 import '../../core/localization/app_strings.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/hotspot_qr_dialog.dart';
 
 class HotspotControllerModal extends StatelessWidget {
   const HotspotControllerModal({super.key});
@@ -189,7 +190,35 @@ class HotspotControllerModal extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => showHotspotQrDialog(context, strings),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.qr_code_2_rounded, size: 18, color: AppColors.accent),
+                            const SizedBox(width: 8),
+                            Text(
+                              strings.hotspotQrCodeBtn,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.accent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
                       strings.hotspotIndependentNote,
                       style: const TextStyle(

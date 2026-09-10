@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_widget_card"
+    android:padding="12dp">
+
+    <!-- Fast Action Toggle Button on End -->
+    <TextView
+        android:id="@+id/btn_widget_toggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentRight="true"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="8dp"
+        android:layout_marginLeft="8dp"
+        android:background="@drawable/bg_notif_btn_green"
+        android:gravity="center"
+        android:minHeight="32dp"
+        android:minWidth="64dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:text="⚡ تشغيل"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <!-- Info Column on Start -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentLeft="true"
+        android:layout_centerVertical="true"
+        android:layout_toStartOf="@id/btn_widget_toggle"
+        android:layout_toLeftOf="@id/btn_widget_toggle"
+        android:orientation="vertical">
+
+        <!-- Title Row with Shield Icon -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_notification"
+                android:contentDescription="Net Guard" />
+
+            <TextView
+                android:id="@+id/tv_widget_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginLeft="6dp"
+                android:text="Net Guard"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_widget_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginLeft="8dp"
+                android:text="🟢 محمي"
+                android:textColor="#10B981"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Line 2: Today's Traffic Usage -->
+        <TextView
+            android:id="@+id/tv_widget_usage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="استهلاك اليوم: 0.0 MB"
+            android:textColor="#94A3B8"
+            android:textSize="11.5sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+    </LinearLayout>
+
+</RelativeLayout>

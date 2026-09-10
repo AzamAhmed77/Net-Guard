@@ -35,6 +35,25 @@ class VpnManager extends ChangeNotifier {
       ? _todayRealUsageMb
       : _apps.fold(0.0, (sum, a) => sum + a.totalMb);
 
+  // Smart Automation & Scheduling State
+  bool _isScheduleEnabled = false;
+  int _scheduleStartHour = 0;
+  int _scheduleStartMinute = 0;
+  int _scheduleEndHour = 6;
+  int _scheduleEndMinute = 0;
+  String _scheduleAction = 'eco'; // 'eco' or 'lockdown'
+  bool _isScheduleCurrentlyActive = false;
+  int? _preScheduleDownloadLimit;
+  int? _preScheduleUploadLimit;
+
+  bool get isScheduleEnabled => _isScheduleEnabled;
+  int get scheduleStartHour => _scheduleStartHour;
+  int get scheduleStartMinute => _scheduleStartMinute;
+  int get scheduleEndHour => _scheduleEndHour;
+  int get scheduleEndMinute => _scheduleEndMinute;
+  String get scheduleAction => _scheduleAction;
+  bool get isScheduleCurrentlyActive => _isScheduleCurrentlyActive;
+
   // Hotspot Speed Controller State
   bool _isHotspotRunning = false;
   int _hotspotPort = 8282;
@@ -190,6 +209,15 @@ class VpnManager extends ChangeNotifier {
     _hotspotDownloadLimitKbps = savedHotspot['dlLimit'] ?? -1;
     _hotspotUploadLimitKbps = savedHotspot['ulLimit'] ?? -1;
     await refreshHotspotStatus();
+
+    final savedSchedule = await StorageService.loadScheduleSettings();
+    _isScheduleEnabled = savedSchedule['enabled'] ?? false;
+    _scheduleStartHour = savedSchedule['startHour'] ?? 0;
+    _scheduleStartMinute = savedSchedule['startMinute'] ?? 0;
+    _scheduleEndHour = savedSchedule['endHour'] ?? 6;
+    _scheduleEndMinute = savedSchedule['endMinute'] ?? 0;
+    _scheduleAction = savedSchedule['action'] ?? 'eco';
+    _checkScheduleRules();
 
     await fetchInstalledApps();
     syncNativeSettings();
@@ -598,6 +626,117 @@ class VpnManager extends ChangeNotifier {
     }
   }
 
+  // ── Smart Automation & Scheduling Methods ──
+  bool isNowInScheduleWindow(DateTime now) {
+    if (!_isScheduleEnabled) return false;
+    final nowMin = now.hour * 60 + now.minute;
+    final startMin = _scheduleStartHour * 60 + _scheduleStartMinute;
+    final endMin = _scheduleEndHour * 60 + _scheduleEndMinute;
+
+    if (startMin == endMin) return false;
+    if (startMin < endMin) {
+      return nowMin >= startMin && nowMin < endMin;
+    } else {
+      // Overnight window (e.g. 23:00 to 06:00)
+      return nowMin >= startMin || nowMin < endMin;
+    }
+  }
+
+  void _checkScheduleRules() {
+    if (!_isScheduleEnabled) {
+      if (_isScheduleCurrentlyActive) {
+        _revertScheduleAction();
+      }
+      return;
+    }
+    final inWindow = isNowInScheduleWindow(DateTime.now());
+    if (inWindow && !_isScheduleCurrentlyActive) {
+      _applyScheduleAction();
+    } else if (!inWindow && _isScheduleCurrentlyActive) {
+      _revertScheduleAction();
+    }
+  }
+
+  void _applyScheduleAction() {
+    _isScheduleCurrentlyActive = true;
+    _preScheduleDownloadLimit = config.downloadSpeedLimit;
+    _preScheduleUploadLimit = config.uploadSpeedLimit;
+
+    if (_scheduleAction == 'eco') {
+      config.downloadSpeedLimit = 64;
+      config.uploadSpeedLimit = 64;
+      syncNativeSettings();
+      addLog(
+        "SCHEDULE",
+        isArabic
+            ? "⚡ بدأ وقت الجدولة التلقائية: تم تطبيق وضع التوفير (64 KB/s)."
+            : "⚡ Schedule window started: Applied Eco Mode (64 KB/s).",
+      );
+    } else if (_scheduleAction == 'lockdown') {
+      toggleBlockAllMode(true);
+      addLog(
+        "SCHEDULE",
+        isArabic
+            ? "🔒 بدأ وقت الجدولة التلقائية: تم تطبيق وضع الإغلاق التام (قطع الإنترنت)."
+            : "🔒 Schedule window started: Applied Total Lockdown (Block All).",
+      );
+    }
+    notifyListeners();
+  }
+
+  void _revertScheduleAction() {
+    _isScheduleCurrentlyActive = false;
+    if (_scheduleAction == 'eco') {
+      final restoreDl = _preScheduleDownloadLimit ?? lastManualDownloadLimit;
+      final restoreUl = _preScheduleUploadLimit ?? lastManualUploadLimit;
+      config.downloadSpeedLimit = restoreDl;
+      config.uploadSpeedLimit = restoreUl;
+      syncNativeSettings();
+      addLog(
+        "SCHEDULE",
+        isArabic
+            ? "🌅 انتهى وقت الجدولة: تمت استعادة السرعة الطبيعية."
+            : "🌅 Schedule window ended: Restored normal speed limits.",
+      );
+    } else if (_scheduleAction == 'lockdown') {
+      toggleBlockAllMode(false);
+      addLog(
+        "SCHEDULE",
+        isArabic
+            ? "🌅 انتهى وقت الجدولة: تمت استعادة الاتصال الطبيعي للتطبيقات."
+            : "🌅 Schedule window ended: Restored normal app access.",
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> updateScheduleSettings({
+    bool? enabled,
+    int? startHour,
+    int? startMinute,
+    int? endHour,
+    int? endMinute,
+    String? action,
+  }) async {
+    if (enabled != null) _isScheduleEnabled = enabled;
+    if (startHour != null) _scheduleStartHour = startHour;
+    if (startMinute != null) _scheduleStartMinute = startMinute;
+    if (endHour != null) _scheduleEndHour = endHour;
+    if (endMinute != null) _scheduleEndMinute = endMinute;
+    if (action != null) _scheduleAction = action;
+
+    await StorageService.saveScheduleSettings(
+      enabled: _isScheduleEnabled,
+      startHour: _scheduleStartHour,
+      startMinute: _scheduleStartMinute,
+      endHour: _scheduleEndHour,
+      endMinute: _scheduleEndMinute,
+      action: _scheduleAction,
+    );
+
+    _checkScheduleRules();
+    notifyListeners();
+  }
 
   void toggleBlockAllMode(bool blockAll) {
     config.globalMode = blockAll ? 'blacklist' : 'whitelist';
@@ -1310,6 +1449,8 @@ class VpnManager extends ChangeNotifier {
         if (_isHotspotRunning && _tickCount % 2 == 0) {
           await refreshHotspotStatus();
         }
+
+        _checkScheduleRules();
       } catch (_) {
       } finally {
         _statsRequestInFlight = false;
