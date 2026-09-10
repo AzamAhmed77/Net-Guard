@@ -431,13 +431,17 @@ class VpnManager extends ChangeNotifier {
     return -1;
   }
 
-  void setDnsProvider(String provider) {
-    config.selectedDnsProvider = provider;
-    if (provider == 'Cloudflare') {
+  void setUnifiedDnsProvider(String provider) {
+    final lower = provider.toLowerCase();
+    config.dohProvider = lower;
+    if (lower == 'cloudflare') {
+      config.selectedDnsProvider = 'Cloudflare';
       config.dnsServers = ['1.1.1.1', '1.0.0.1'];
-    } else if (provider == 'AdGuard') {
+    } else if (lower == 'adguard') {
+      config.selectedDnsProvider = 'AdGuard';
       config.dnsServers = ['94.140.14.14', '94.140.15.15'];
-    } else if (provider == 'Google') {
+    } else if (lower == 'google') {
+      config.selectedDnsProvider = 'Google';
       config.dnsServers = ['8.8.8.8', '8.8.4.4'];
     }
     _persistState();
@@ -445,9 +449,13 @@ class VpnManager extends ChangeNotifier {
     addLog(
         "INFO",
         isArabic
-            ? "تم اختيار مزود DNS: $provider"
-            : "Selected DNS Provider: $provider");
+            ? "تم اختيار مزود DNS: ${config.selectedDnsProvider}"
+            : "Selected DNS Provider: ${config.selectedDnsProvider}");
     notifyListeners();
+  }
+
+  void setDnsProvider(String provider) {
+    setUnifiedDnsProvider(provider);
   }
 
   Future<void> setLanguage(String langCode) async {
@@ -1300,9 +1308,7 @@ class VpnManager extends ChangeNotifier {
   }
 
   void setDohProvider(String provider) {
-    config.dohProvider = provider;
-    syncNativeSettings();
-    notifyListeners();
+    setUnifiedDnsProvider(provider);
   }
 
   void setCustomDohUrl(String url) {

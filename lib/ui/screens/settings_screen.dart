@@ -468,55 +468,55 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 20),
 
           // ==========================================
-          // 5. ENCRYPTED DNS (DoH) & IPV6 PROTECTION
+          // 5. UNIFIED SECURE DNS & IPV6 PROTECTION
           // ==========================================
-          _buildSectionHeader(strings.dohSectionTitle),
+          _buildSectionHeader(strings.isAr ? 'نظام خوادم DNS والحماية المتقدمة' : 'Secure DNS & Protection'),
           _buildCard(
             children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.isAr ? 'مزود خادم DNS المفضل' : 'Preferred DNS Provider',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDohChip('Cloudflare', vpn.config.dohProvider == 'cloudflare', () {
+                            vpn.setUnifiedDnsProvider('cloudflare');
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildDohChip('AdGuard', vpn.config.dohProvider == 'adguard', () {
+                            vpn.setUnifiedDnsProvider('adguard');
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildDohChip('Google', vpn.config.dohProvider == 'google', () {
+                            vpn.setUnifiedDnsProvider('google');
+                          }),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: AppColors.borderDark, height: 1),
               _buildSwitchTile(
                 icon: Icons.lock_outline_rounded,
                 title: strings.dohTitle,
-                subtitle: strings.dohDesc,
+                subtitle: vpn.config.dohEnabled
+                    ? (strings.isAr ? 'مفعّل: استعلامات مشفرة بالكامل عبر HTTPS لمنع التجسس' : 'Enabled: Fully encrypted queries via HTTPS')
+                    : (strings.isAr ? 'معطّل: اتصال مباشر عبر بروتوكول IP العادي' : 'Disabled: Standard direct IP connection'),
                 value: vpn.config.dohEnabled,
                 onChanged: (val) => vpn.setDohEnabled(val),
               ),
-              if (vpn.config.dohEnabled) ...[
-                const Divider(color: AppColors.borderDark, height: 1),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        strings.dohProviderLabel,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildDohChip('Cloudflare', vpn.config.dohProvider == 'cloudflare', () {
-                              vpn.setDohProvider('cloudflare');
-                            }),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildDohChip('AdGuard', vpn.config.dohProvider == 'adguard', () {
-                              vpn.setDohProvider('adguard');
-                            }),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildDohChip('Google', vpn.config.dohProvider == 'google', () {
-                              vpn.setDohProvider('google');
-                            }),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               const Divider(color: AppColors.borderDark, height: 1),
               _buildSwitchTile(
                 icon: Icons.security_rounded,
@@ -524,39 +524,6 @@ class SettingsScreen extends StatelessWidget {
                 subtitle: strings.ipv6ProtectionDesc,
                 value: vpn.config.ipv6LeakProtection,
                 onChanged: (val) => vpn.setIpv6LeakProtection(val),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // ==========================================
-          // 5.1 STANDARD DNS RESOLVER
-          // ==========================================
-          _buildSectionHeader(strings.dnsProviderTitle),
-          _buildCard(
-            children: [
-              _buildDnsRadio(
-                title: 'Cloudflare (1.1.1.1)',
-                subtitle: strings.isAr ? 'أسرع DNS عالمي مشفر مع حماية الخصوصية' : 'Fastest encrypted DNS with zero logging',
-                servers: ['1.1.1.1', '1.0.0.1'],
-                providerName: 'Cloudflare',
-                vpn: vpn,
-              ),
-              const Divider(color: AppColors.borderDark, height: 1),
-              _buildDnsRadio(
-                title: 'AdGuard DNS',
-                subtitle: strings.isAr ? 'حجب تلقائي لكافة الإعلانات والتتبع' : 'Auto blocks all ads & tracking domains',
-                servers: ['94.140.14.14', '94.140.15.15'],
-                providerName: 'AdGuard',
-                vpn: vpn,
-              ),
-              const Divider(color: AppColors.borderDark, height: 1),
-              _buildDnsRadio(
-                title: 'Google Public DNS',
-                subtitle: strings.isAr ? 'خوادم موثوقة ومستقرة عالمياً (8.8.8.8)' : 'Reliable and fast global resolver',
-                servers: ['8.8.8.8', '8.8.4.4'],
-                providerName: 'Google',
-                vpn: vpn,
               ),
             ],
           ),
@@ -829,54 +796,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDnsRadio({
-    required String title,
-    required String subtitle,
-    required List<String> servers,
-    required String providerName,
-    required VpnManager vpn,
-  }) {
-    final isSelected = vpn.config.selectedDnsProvider == providerName;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        vpn.setDnsProvider(providerName);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: isSelected ? AppColors.accent : AppColors.textSecondary,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildDohChip(String label, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
