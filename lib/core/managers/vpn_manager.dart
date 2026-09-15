@@ -173,6 +173,7 @@ class VpnManager extends ChangeNotifier {
     try {
       final savedLang = await StorageService.loadLanguage();
       _currentLocale = Locale(savedLang);
+      notifyListeners();
       await MethodChannelService.setAppLanguage(savedLang);
     } catch (_) {}
 
@@ -217,9 +218,20 @@ class VpnManager extends ChangeNotifier {
     _scheduleEndHour = savedSchedule['endHour'] ?? 6;
     _scheduleEndMinute = savedSchedule['endMinute'] ?? 0;
     _scheduleAction = savedSchedule['action'] ?? 'eco';
+    config.scheduleEnabled = _isScheduleEnabled;
+    config.activeScheduleStartHour = _scheduleStartHour;
+    config.schedStartM = _scheduleStartMinute;
+    config.activeScheduleEndHour = _scheduleEndHour;
+    config.schedEndM = _scheduleEndMinute;
     _checkScheduleRules();
 
+    final savedProfile = await StorageService.loadActiveSecurityProfile();
+    activeSecurityProfile = savedProfile;
+
     await fetchInstalledApps();
+    if (activeSecurityProfile == 'custom' && await StorageService.hasSavedCustomProfile()) {
+      await StorageService.restoreCustomProfileSettings(_apps);
+    }
     syncNativeSettings();
 
     try {
@@ -529,6 +541,7 @@ class VpnManager extends ChangeNotifier {
   void _persistState() {
     StorageService.saveConfig(config);
     StorageService.saveAppSettings(_apps);
+    StorageService.saveActiveSecurityProfile(activeSecurityProfile);
   }
 
   // ── Hotspot Speed Controller Methods ──
@@ -733,6 +746,12 @@ class VpnManager extends ChangeNotifier {
     if (endMinute != null) _scheduleEndMinute = endMinute;
     if (action != null) _scheduleAction = action;
 
+    config.scheduleEnabled = _isScheduleEnabled;
+    config.activeScheduleStartHour = _scheduleStartHour;
+    config.schedStartM = _scheduleStartMinute;
+    config.activeScheduleEndHour = _scheduleEndHour;
+    config.schedEndM = _scheduleEndMinute;
+
     await StorageService.saveScheduleSettings(
       enabled: _isScheduleEnabled,
       startHour: _scheduleStartHour,
@@ -742,6 +761,8 @@ class VpnManager extends ChangeNotifier {
       action: _scheduleAction,
     );
 
+    _persistState();
+    syncNativeSettings();
     _checkScheduleRules();
     notifyListeners();
   }
@@ -873,6 +894,7 @@ class VpnManager extends ChangeNotifier {
         count++;
       }
     }
+    activeSecurityProfile = 'custom';
     _persistState();
     syncNativeSettings();
     addLog(
@@ -894,6 +916,7 @@ class VpnManager extends ChangeNotifier {
         count++;
       }
     }
+    activeSecurityProfile = 'custom';
     _persistState();
     syncNativeSettings();
     addLog(
@@ -909,6 +932,7 @@ class VpnManager extends ChangeNotifier {
     if (mode == 'custom') {
       app.customSpeedLimitKbps = customSpeedKbps;
     }
+    activeSecurityProfile = 'custom';
     _persistState();
     syncNativeSettings();
     final modeTitle = mode == 'default'
@@ -956,6 +980,7 @@ class VpnManager extends ChangeNotifier {
 
   void toggleAppWifi(AppInfo app) {
     app.isWifiAllowed = !app.isWifiAllowed;
+    activeSecurityProfile = 'custom';
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -963,6 +988,7 @@ class VpnManager extends ChangeNotifier {
 
   void toggleAppMobile(AppInfo app) {
     app.isMobileAllowed = !app.isMobileAllowed;
+    activeSecurityProfile = 'custom';
     _persistState();
     syncNativeSettings();
     notifyListeners();
@@ -1419,7 +1445,7 @@ class VpnManager extends ChangeNotifier {
   double _lastNotifiedUp = -1.0;
 
   void _startRealTrafficTicker() {
-    _statsTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+    _statsTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_statsRequestInFlight) return;
       _statsRequestInFlight = true;
       try {
@@ -1463,7 +1489,7 @@ class VpnManager extends ChangeNotifier {
         }
 
         _tickCount++;
-        if (_tickCount % 6 == 0 || _tickCount == 1) {
+        if (_tickCount % 2 == 0 || _tickCount == 1) {
           final appTraffic = await MethodChannelService.getPerAppTraffic();
           if (appTraffic.isNotEmpty) {
             bool anyUpdated = false;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/managers/vpn_manager.dart';
@@ -28,21 +29,30 @@ class _UsageTabState extends State<UsageTab> {
   double _totalWifiMb = 0.0;
   double _totalMobileMb = 0.0;
   bool _isLoadingTraffic = false;
+  Timer? _liveRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadPerAppTrafficByNetwork();
+    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted && _session == 'today' && !_isLoadingTraffic) {
+        _loadPerAppTrafficByNetwork(silent: true);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _liveRefreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadPerAppTrafficByNetwork() async {
-    setState(() => _isLoadingTraffic = true);
+  Future<void> _loadPerAppTrafficByNetwork({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoadingTraffic = true);
+    }
     try {
       final data = await MethodChannelService.getPerAppTrafficByNetwork(
         session: _session,
@@ -63,7 +73,7 @@ class _UsageTabState extends State<UsageTab> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoadingTraffic = false);
+      if (mounted && !silent) setState(() => _isLoadingTraffic = false);
     }
   }
 

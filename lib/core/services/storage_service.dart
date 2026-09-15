@@ -16,6 +16,23 @@ class StorageService {
   static const String _keySpikeAlert = 'cybnux_spike_alert';
   static const String _keyLockdownScreenOff = 'cybnux_lockdown_screen_off';
   static const String _keyAutoQuarantine = 'cybnux_auto_quarantine';
+  static const String _keyActiveSecurityProfile = 'cybnux_active_security_profile';
+
+  static Future<void> saveActiveSecurityProfile(String profile) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyActiveSecurityProfile, profile);
+    } catch (_) {}
+  }
+
+  static Future<String> loadActiveSecurityProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_keyActiveSecurityProfile) ?? 'default';
+    } catch (_) {
+      return 'default';
+    }
+  }
 
   static Future<void> saveMonitorEnabled(bool val) async {
     try {

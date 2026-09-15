@@ -80,7 +80,6 @@ class HotspotProxyServer {
         private var tokens: Long = if (bytesPerSecond > 0) bytesPerSecond else 2 * 1024 * 1024
         private var lastRefillTime: Long = System.currentTimeMillis()
 
-        @Synchronized
         fun limit(bytes: Int) {
             val limitRate = bytesPerSecond
             if (limitRate < 0) return // Unlimited
@@ -94,27 +93,33 @@ class HotspotProxyServer {
                 return
             }
 
-            val now = System.currentTimeMillis()
-            val elapsedTime = now - lastRefillTime
+            val sleepTimeMs: Long
+            synchronized(this) {
+                val now = System.currentTimeMillis()
+                val elapsedTime = now - lastRefillTime
 
-            if (elapsedTime > 0) {
-                val refill = (elapsedTime * limitRate) / 1000
-                tokens = Math.min(limitRate * 2, tokens + refill)
-                lastRefillTime = now
+                if (elapsedTime > 0) {
+                    val refill = (elapsedTime * limitRate) / 1000
+                    tokens = Math.min(limitRate * 2, tokens + refill)
+                    lastRefillTime = now
+                }
+
+                tokens -= bytes
+                if (tokens < 0) {
+                    sleepTimeMs = (-tokens * 1000) / limitRate
+                    lastRefillTime = System.currentTimeMillis()
+                    tokens = 0
+                } else {
+                    sleepTimeMs = 0L
+                }
             }
 
-            tokens -= bytes
-            if (tokens < 0) {
-                val sleepTime = (-tokens * 1000) / limitRate
-                if (sleepTime > 0) {
-                    try {
-                        Thread.sleep(Math.min(sleepTime, 1000))
-                    } catch (e: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                    }
+            if (sleepTimeMs > 0) {
+                try {
+                    Thread.sleep(Math.min(sleepTimeMs, 1000L))
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
                 }
-                lastRefillTime = System.currentTimeMillis()
-                tokens = 0
             }
         }
     }
@@ -263,6 +268,49 @@ class HotspotProxyServer {
 
         val method = parts[0].uppercase()
         val target = parts[1]
+
+        // ── Instant Auto-Proxy (PAC) & Status Endpoint ──
+        if (method == "GET" && (target.equals("/pac", ignoreCase = true) || 
+                                target.equals("/proxy.pac", ignoreCase = true) || 
+                                target.equals("/wpad.dat", ignoreCase = true) || 
+                                target.endsWith("/pac", ignoreCase = true))) {
+            val ip = getHotspotIpAddress()
+            val pacScript = "function FindProxyForURL(url, host) { return \"PROXY $ip:$serverPort; DIRECT\"; }\n"
+            val pacBytes = pacScript.toByteArray(Charsets.UTF_8)
+            val resp = "HTTP/1.1 200 OK\r\n" +
+                       "Content-Type: application/x-ns-proxy-autoconfig\r\n" +
+                       "Content-Length: ${pacBytes.size}\r\n" +
+                       "Access-Control-Allow-Origin: *\r\n" +
+                       "Connection: close\r\n\r\n"
+            try {
+                clientOut.write(resp.toByteArray(Charsets.UTF_8))
+                clientOut.write(pacBytes)
+                clientOut.flush()
+            } catch (_: Exception) {}
+            clientSocket.close()
+            return
+        }
+
+        if (method == "GET" && target == "/") {
+            val ip = getHotspotIpAddress()
+            val dlKbps = if (downloadLimiter.bytesPerSecond > 0) downloadLimiter.bytesPerSecond / 1024 else -1
+            val speedText = if (dlKbps > 0) "$dlKbps KB/s" else "Unlimited"
+            val html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Net Guard</title>" +
+                       "<style>body{font-family:sans-serif;background:#0f172a;color:#fff;text-align:center;padding:40px;line-height:1.6;}</style>" +
+                       "</head><body><h2>🟢 Net Guard Hotspot Controller</h2>" +
+                       "<p>Speed Limit: <b>$speedText</b></p>" +
+                       "<p>Proxy: <b>$ip:$serverPort</b></p>" +
+                       "<p>PAC URL: <b>http://$ip:$serverPort/pac</b></p></body></html>"
+            val htmlBytes = html.toByteArray(Charsets.UTF_8)
+            val resp = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${htmlBytes.size}\r\nConnection: close\r\n\r\n"
+            try {
+                clientOut.write(resp.toByteArray(Charsets.UTF_8))
+                clientOut.write(htmlBytes)
+                clientOut.flush()
+            } catch (_: Exception) {}
+            clientSocket.close()
+            return
+        }
 
         var targetHost: String
         var targetPort: Int

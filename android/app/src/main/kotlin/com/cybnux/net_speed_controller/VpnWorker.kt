@@ -133,7 +133,7 @@ class VpnWorker(private val vpnService: VpnService) {
     private val perAppBytes = ConcurrentHashMap<String, Long>()
 
     fun addAppUsage(pkg: String?, bytes: Long) {
-        if (pkg == null || bytes <= 0) return
+        if (pkg == null || bytes <= 0 || pkg == vpnService.packageName) return
         perAppBytes.merge(pkg, bytes) { old, new -> old + new }
     }
 
@@ -433,8 +433,16 @@ class VpnWorker(private val vpnService: VpnService) {
 
             // Update existing limiters with new values immediately
             for ((pkg, lim) in dlLimits) {
-                appDlLimiters[pkg]?.limitBps = lim
-                appUlLimiters[pkg]?.limitBps = lim
+                appDlLimiters[pkg]?.updateLimit(lim)
+                appUlLimiters[pkg]?.updateLimit(lim)
+            }
+            nextAppDlSendTimeMs.clear()
+
+            val now = System.currentTimeMillis()
+            val tempQueue = ArrayList<ScheduledPacket>()
+            toDeviceQueue.drainTo(tempQueue)
+            for (pkt in tempQueue) {
+                toDeviceQueue.add(ScheduledPacket(pkt.data, minOf(pkt.sendTimeMs, now)))
             }
 
             // Immediately disconnect/close any TCP and UDP connections for muted apps (0 KB/s)
@@ -465,6 +473,9 @@ class VpnWorker(private val vpnService: VpnService) {
             refillTokens()
             resumePausedTcpReaders()
             selector?.wakeup()
+            synchronized(queueLock) {
+                queueLock.notifyAll()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing app speed configs: ${e.message}")
         }
@@ -1343,11 +1354,11 @@ class VpnWorker(private val vpnService: VpnService) {
                 if (shouldThrottle) {
                     val appLimiter = if (pkg != null) getAppDlLimiter(pkg) else null
                     if (appLimiter != null) {
-                        if (appLimiter.limitBps <= 0L || appLimiter.getAvailableTokens() <= 0) {
+                        if (appLimiter.limitBps == 0L || (appLimiter.limitBps > 0 && appLimiter.getAvailableTokens() <= 0)) {
                             canRead = false
                         }
                     } else if (downloadBps >= 0) {
-                        if (downloadBps == 0L || dlTokens <= 0) {
+                        if (downloadBps == 0L || (downloadBps > 0 && dlTokens <= 0)) {
                             canRead = false
                         }
                     }
@@ -2113,6 +2124,13 @@ class VpnWorker(private val vpnService: VpnService) {
 class RateLimiter(var limitBps: Long) {
     private var tokens: Long = if (limitBps > 0) Math.max(limitBps, 65536L) else 0L
     private var lastRefill: Long = System.currentTimeMillis()
+
+    @Synchronized
+    fun updateLimit(newLimitBps: Long) {
+        limitBps = newLimitBps
+        lastRefill = System.currentTimeMillis()
+        tokens = if (newLimitBps > 0) Math.max(newLimitBps, 65536L) else 0L
+    }
 
     @Synchronized
     fun refill() {

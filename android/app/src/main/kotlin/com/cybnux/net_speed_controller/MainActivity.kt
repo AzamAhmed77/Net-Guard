@@ -288,6 +288,7 @@ class MainActivity: FlutterActivity() {
                             val pm = this@MainActivity.packageManager
                             val packages = pm.getInstalledPackages(0)
                             for (pkg in packages) {
+                                if (pkg.packageName == packageName) continue
                                 val appInfo = pkg.applicationInfo ?: continue
                                 val flags = appInfo.flags
                                 val isSystem = (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
@@ -337,9 +338,11 @@ class MainActivity: FlutterActivity() {
                             val installedUids = packages.mapNotNull { it.applicationInfo?.uid }.toSet()
                             val tetherBytes = todayUidBytes[NetworkStats.Bucket.UID_TETHERING] ?: 0L
                             if (tetherBytes > 0L) {
+                                val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+                                val isEn = (prefs.getString("app_language", "ar") == "en")
                                 val tMap = HashMap<String, Any>()
                                 tMap["packageName"] = "com.cybnux.tethering_hotspot"
-                                tMap["appName"] = "نقطة اتصال الهواتف (بث)"
+                                tMap["appName"] = if (isEn) "Tethering & Hotspot" else "نقطة اتصال الهواتف (بث)"
                                 tMap["uid"] = NetworkStats.Bucket.UID_TETHERING
                                 tMap["isSystem"] = true
                                 tMap["totalMb"] = tetherBytes.toDouble() / (1024.0 * 1024.0)
@@ -353,9 +356,11 @@ class MainActivity: FlutterActivity() {
                                 }
                             }
                             if (removedBytes > 0L) {
+                                val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+                                val isEn = (prefs.getString("app_language", "ar") == "en")
                                 val rMap = HashMap<String, Any>()
                                 rMap["packageName"] = "com.cybnux.uninstalled_apps"
-                                rMap["appName"] = "تطبيقات محذوفة"
+                                rMap["appName"] = if (isEn) "Uninstalled Apps" else "تطبيقات محذوفة"
                                 rMap["uid"] = NetworkStats.Bucket.UID_REMOVED
                                 rMap["isSystem"] = false
                                 rMap["totalMb"] = removedBytes.toDouble() / (1024.0 * 1024.0)
@@ -531,6 +536,7 @@ class MainActivity: FlutterActivity() {
                                     } catch (_: Exception) {}
 
                                     for ((pkgName, uid) in cachedPackageUids) {
+                                        if (pkgName == packageName) continue
                                         val sysBytes = uidBytesMap[uid] ?: 0L
                                         if (sysBytes > 0L) {
                                             map[pkgName] = sysBytes.toDouble() / (1024.0 * 1024.0)
@@ -567,6 +573,7 @@ class MainActivity: FlutterActivity() {
 
                             // Fallback to TrafficStats if permission not granted
                             for ((pkgName, uid) in cachedPackageUids) {
+                                if (pkgName == packageName) continue
                                 val uidRx = android.net.TrafficStats.getUidRxBytes(uid)
                                 val uidTx = android.net.TrafficStats.getUidTxBytes(uid)
                                 if (uidRx > 0L || uidTx > 0L) {
@@ -721,6 +728,7 @@ class MainActivity: FlutterActivity() {
                                             val pkgs = pm.getPackagesForUid(uid)
                                             if (pkgs != null && pkgs.isNotEmpty()) {
                                                 for (pkg in pkgs) {
+                                                    if (pkg == packageName) continue
                                                     appUsageMap[pkg] = (appUsageMap[pkg] ?: 0.0) + mb
                                                 }
                                             } else {
@@ -979,6 +987,7 @@ class MainActivity: FlutterActivity() {
                                             val pkgs = pm.getPackagesForUid(uid)
                                             if (pkgs != null && pkgs.isNotEmpty()) {
                                                 for (pkg in pkgs) {
+                                                    if (pkg == packageName) continue
                                                     wifiMap[pkg] = (wifiMap[pkg] ?: 0.0) + mb
                                                 }
                                             } else {
@@ -1063,6 +1072,7 @@ class MainActivity: FlutterActivity() {
                                             val pkgs = pm.getPackagesForUid(uid)
                                             if (pkgs != null && pkgs.isNotEmpty()) {
                                                 for (pkg in pkgs) {
+                                                    if (pkg == packageName) continue
                                                     mobileMap[pkg] = (mobileMap[pkg] ?: 0.0) + mb
                                                 }
                                             } else {
@@ -1086,6 +1096,7 @@ class MainActivity: FlutterActivity() {
                                     }
 
                                     for ((pkg, bytes) in liveUsage) {
+                                        if (pkg == packageName) continue
                                         val mb = bytes.toDouble() / (1024.0 * 1024.0)
                                         if (mb > 0.0) {
                                             if (isWifiActive) {
@@ -1110,6 +1121,8 @@ class MainActivity: FlutterActivity() {
                         }
 
                         val res = HashMap<String, Any>()
+                        wifiMap.remove(packageName)
+                        mobileMap.remove(packageName)
                         res["wifi"] = wifiMap
                         res["mobile"] = mobileMap
                         res["totalWifiMb"] = totalWifiBytes.toDouble() / (1024.0 * 1024.0)
@@ -1262,7 +1275,9 @@ class MainActivity: FlutterActivity() {
                     val lang = call.argument<String>("language") ?: "ar"
                     val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
                     prefs.edit().putString("app_language", lang).apply()
-                    NetworkMonitorService.instance?.updateNotification()
+                    NetworkMonitorService.instance?.updateNotification(force = true)
+                    NetGuardTileService.requestTileUpdate(this@MainActivity)
+                    NetGuardWidgetProvider.updateAllWidgets(this@MainActivity)
                     result.success(true)
                 }
                 "startHotspotProxy" -> {

@@ -225,8 +225,8 @@ class NetworkMonitorService : Service() {
             }
         }
 
-        // 2. تحديث استهلاك اليوم لشبكة الواي فاي والموبايل (كل 30 ثانية لتوفير البطارية ومنع ثقل المعالج)
-        val queryInterval = if (isScreenOn) 30000L else 60000L
+        // 2. تحديث استهلاك اليوم لشبكة الواي فاي والموبايل (كل 3 ثواني عند فتح الشاشة لاستجابة فورية)
+        val queryInterval = if (isScreenOn) 3000L else 60000L
         if (now - lastUsageQueryMs >= queryInterval || lastUsageQueryMs == 0L) {
             queryTodayUsage()
             lastUsageQueryMs = now
