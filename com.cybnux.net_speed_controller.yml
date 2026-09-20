@@ -9,7 +9,7 @@ IssueTracker: https://github.com/AzamAhmed77/Net-Guard/issues
 Changelog: https://github.com/AzamAhmed77/Net-Guard/releases
 
 AutoName: Net Guard
-Summary: Per-app speed limiter, smart firewall, encrypted DoH DNS & hotspot controller
+Summary: Per-app speed limiter, smart firewall, encrypted DoH DNS & data saver
 Description: |-
   Net Guard is an advanced network traffic controller, on-device firewall,
   and data saver for Android. It operates completely on-device without root.
@@ -19,7 +19,6 @@ Description: |-
   * On-device firewall for Wi-Fi and Mobile data
   * Encrypted DNS-over-HTTPS (DoH) with Cloudflare, AdGuard, Google
   * Advanced IPv6 leak protection & AAAA resolution
-  * Hotspot tethering speed controller via local proxy
   * Live status bar network speed notification (works without VPN)
   * Privacy-first design with 100% on-device processing
 

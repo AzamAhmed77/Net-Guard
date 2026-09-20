@@ -15,16 +15,14 @@
 - [🇸🇦 الشرح باللغة العربية](#-الشرح-باللغة-العربية)
   - [1. نبذة عن التطبيق](#1-نبذة-عن-التطبيق)
   - [2. المميزات الرئيسية بالتفصيل](#2-المميزات-الرئيسية-بالتفصيل)
-  - [3. طريقة استخدام متحكم سرعة بث نقطة الاتصال](#3-طريقة-استخدام-متحكم-سرعة-بث-نقطة-الاتصال-hotspot)
-  - [4. المعمارية التقنية](#4-المعمارية-التقنية)
+    - [4. المعمارية التقنية](#4-المعمارية-التقنية)
   - [5. طريقة التثبيت والبناء](#5-طريقة-التثبيت-والبناء)
   - [6. الأذونات المطلوبة](#6-الأذونات-المطلوبة-وسبب-طلبها)
   - [7. حقوق الملكية والترخيص](#7-حقوق-الملكية-والترخيص)
 - [🇬🇧 English Documentation](#-english-documentation)
   - [1. Overview](#1-overview)
   - [2. Comprehensive Key Features](#2-comprehensive-key-features)
-  - [3. Hotspot Speed Controller Setup Guide](#3-hotspot-speed-controller-setup-guide)
-  - [4. Technical Architecture](#4-technical-architecture)
+    - [4. Technical Architecture](#4-technical-architecture)
   - [5. How to Build & Install](#5-how-to-build--install)
   - [6. Required Android Permissions](#6-required-android-permissions)
   - [7. Copyright & License](#7-copyright--license)
@@ -34,7 +32,7 @@
 # 🇸🇦 الشرح باللغة العربية
 
 ## 1. نبذة عن التطبيق
-**Net Guard (حارس الإنترنت)** هو تطبيق متكامل وقوي لنظام أندرويد مصمم للتحكم الكامل في حركة البيانات والإنترنت داخل هاتفك. يجمع التطبيق بين **جدار حماية ذكي (Firewall)**، **محدد سرعة فائق الدقة (Bandwidth Throttler)**، **متحكم سرعة بث نقطة الاتصال (Hotspot Speed Controller)**، و**نظام مراقبة استهلاك الباقة الشهرية**، كل ذلك بدون الحاجة إلى صلاحيات الروت (**No Root Required**) وبأعلى معايير الحفاظ على شحن البطارية.
+**Net Guard (حارس الإنترنت)** هو تطبيق متكامل وقوي لنظام أندرويد مصمم للتحكم الكامل في حركة البيانات والإنترنت داخل هاتفك. يجمع التطبيق بين **جدار حماية ذكي (Firewall)**، **محدد سرعة فائق الدقة (Bandwidth Throttler)**، و**نظام مراقبة استهلاك الباقة الشهرية**، كل ذلك بدون الحاجة إلى صلاحيات الروت (**No Root Required**) وبأعلى معايير الحفاظ على شحن البطارية.
 
 ---
 
@@ -53,13 +51,6 @@
   - **الوضع العادي (Normal Mode):** تصفح متوازن بدون استهلاك مفرط.
   - **الوضع المفتوح (Unlimited):** سرعة الشبكة القصوى عند الحاجة.
 - محرك خنق حركة البيانات المعتمد على خوارزمية **Token-Bucket** الرياضية لضمان تدفق سلس للبيانات دون تقطيع الاتصال.
-
-### 📡 متحكم سرعة بث نقطة الاتصال (Hotspot Speed Controller)
-- **تقييد سرعة الأجهزة المتصلة:** حماية باقة هاتفك عند مشاركة الإنترنت مع الآخرين.
-- **خيارات سرعة متعددة تشمل:**
-  - **`64 KB/s` (توفير فائق):** كافٍ لرسائل الواتساب والتصفح الخفيف جداً ويمنع الفيديوهات الثقيلة تماماً.
-  - `128 KB/s` - `256 KB/s` - `512 KB/s` - `1 MB/s` - `2 MB/s` - `مفتوح (∞)`.
-- **خادم وسيط محلي متطور (High-Performance Local Proxy Server):** يعمل على المنفذ `8282` ويعمل بشكل مستقل تماماً عن حماية الهاتف الخاصة بـ VPN.
 
 ### 🔔 شريط إشعارات حي ذكي ومتكيف (Adaptive Live Notification)
 - يعرض سرعة التحميل والرفع اللحظية واستهلاك اليوم لشبكة الواي فاي والبيانات.
@@ -86,16 +77,6 @@
 
 ---
 
-## 3. طريقة استخدام متحكم سرعة بث نقطة الاتصال (Hotspot)
-1. شغّل **نقطة اتصال الهواتف المحمولة (Hotspot)** من إعدادات هاتفك.
-2. من داخل تطبيق Net Guard، اذهب للإعدادات وفعّل **«متحكم سرعة بث نقطة الاتصال»**، ثم اختر السرعة المطلوبة (مثلاً: `64 KB/s`).
-3. في الجهاز المتصل (هاتف آخر أو لابتوب):
-   - ادخل إلى إعدادات Wi-Fi > خيارات متقدمة > الوكيل (Proxy) > يدوي (Manual).
-   - اسم مضيف الوكيل: `192.168.43.1`
-   - المنفذ: `8282`
-   - اضغط حفظ. سيعمل الإنترنت في الجهاز المتصل بالسرعة المحددة بالضبط!
-
----
 
 ## 4. المعمارية التقنية
 ```
@@ -103,7 +84,7 @@
 │                 Flutter Presentation Layer                  │
 │       (Provider State Management + Modern Matte Theme)      │
 │  - DashboardTab         - FirewallTab        - Settings     │
-│  - UsageHistoryTab      - DnsSecurityTab     - HotspotModal │
+│  - UsageHistoryTab      - DnsSecurityTab     │
 └──────────────────────────────┬──────────────────────────────┘
                                │ MethodChannel Bridge
 ┌──────────────────────────────▼──────────────────────────────┐
@@ -114,7 +95,7 @@
 │  │ (VPN Tunnel & Firewall) │   │ (Speed & Live Notif)     │ │
 │  └─────────────────────────┘   └──────────────────────────┘ │
 │  ┌─────────────────────────┐   ┌──────────────────────────┐ │
-│  │   HotspotProxyServer    │   │      PackageReceiver     │ │
+│  │                         │   │      PackageReceiver     │ │
 │  │ (Rate-Limited Tethering)│   │ (Auto Quarantine Engine) │ │
 │  └─────────────────────────┘   └──────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
@@ -181,13 +162,6 @@ adb install -r -d build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
   - **Unlimited Mode:** Full network speed on demand.
 - Powered by a mathematically accurate **Token-Bucket Rate Limiter** ensuring smooth transmission without connection drops.
 
-### 📡 Hotspot / Tethering Speed Controller
-- **Throttle Connected Devices:** Prevent connected phones, laptops, and tablets from draining your mobile data package.
-- **Configurable Speed Limit Presets:**
-  - **`64 KB/s` (Ultra Eco):** Perfect for WhatsApp text messaging and essential connectivity while strictly blocking heavy video streaming.
-  - `128 KB/s` - `256 KB/s` - `512 KB/s` - `1 MB/s` - `2 MB/s` - `Unlimited (∞)`.
-- **High-Performance Local Proxy Server:** Runs locally on port `8282` and functions completely independently from the device's VPN protection.
-
 ### 🔔 Smart Adaptive Live Notification
 - Real-time download/upload speed meter and daily Wi-Fi & Mobile data usage counters.
 - **System-Adaptive Day/Night Colors:**
@@ -213,23 +187,12 @@ adb install -r -d build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 
 ---
 
-## 3. Hotspot Speed Controller Setup Guide
-1. Enable **Mobile Hotspot** in your Android device system settings.
-2. Open Net Guard Settings, toggle on **"Hotspot Speed Controller"**, and choose your target speed limit (e.g., `64 KB/s`).
-3. On the connected device (guest phone or PC):
-   - Go to Wi-Fi Settings > Advanced > Proxy > **Manual**.
-   - Proxy Hostname: `192.168.43.1`
-   - Proxy Port: `8282`
-   - Save. The connected device will instantly browse at the throttled speed limit.
-
----
 
 ## 4. Technical Architecture
 - **UI Layer:** Flutter with Provider state management and refined dark/light glassmorphic widgets.
 - **Bridge:** Optimized binary MethodChannel passing raw primitives and pre-compressed Base64 assets.
 - **VPN Core:** Native Kotlin `VpnService` with custom MTU tuning and packet filtering rules.
 - **Speed Monitor:** `NetworkMonitorService` with `TrafficStats` and `NetworkStatsManager` daily usage tracking.
-- **Hotspot Engine:** `HotspotProxyServer` with non-blocking socket pools and token-bucket rate limiting.
 
 ---
 
