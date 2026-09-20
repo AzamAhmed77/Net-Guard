@@ -1,7 +1,7 @@
 name: net_speed_controller
 description: "Net Guard — Network Guardian & Intelligent Traffic Controller"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
