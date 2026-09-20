@@ -52,7 +52,7 @@ class NetGuardWidgetProvider : AppWidgetProvider() {
 
                 // Determine language (check cybnux_settings or system locale)
                 val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
-                val savedLang = prefs.getString("selected_language", null)
+                val savedLang = prefs.getString("app_language", prefs.getString("selected_language", null))
                 val isAr = if (savedLang != null) {
                     savedLang == "ar"
                 } else {
@@ -77,7 +77,7 @@ class NetGuardWidgetProvider : AppWidgetProvider() {
                 val usageStr = formatBytes(totalTodayBytes)
                 views.setTextViewText(
                     R.id.tv_widget_usage,
-                    if (isAr) "استهلاك اليوم: $usageStr" else "Today: $usageStr"
+                    if (isAr) "اليوم: $usageStr" else "Today: $usageStr"
                 )
 
                 // Toggle PendingIntent (Sends broadcast to VpnActionReceiver)
@@ -100,8 +100,8 @@ class NetGuardWidgetProvider : AppWidgetProvider() {
                 val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
-                if (launchIntent != null) {
-                    val openPendingIntent = PendingIntent.getActivity(
+                val launchPendingIntent = if (launchIntent != null) {
+                    PendingIntent.getActivity(
                         context,
                         1002,
                         launchIntent,
@@ -111,13 +111,16 @@ class NetGuardWidgetProvider : AppWidgetProvider() {
                             PendingIntent.FLAG_UPDATE_CURRENT
                         }
                     )
-                    views.setOnClickPendingIntent(R.id.widget_container, openPendingIntent)
+                } else null
+
+                if (launchPendingIntent != null) {
+                    views.setOnClickPendingIntent(R.id.widget_container, launchPendingIntent)
                 }
 
                 appWidgetManager.updateAppWidget(appWidgetId, views)
-                Log.d(TAG, "Widget $appWidgetId updated successfully (isRunning=$isRunning)")
+                Log.d(TAG, "Widget $appWidgetId updated successfully (isRunning=$isRunning, isAr=$isAr)")
             } catch (e: Exception) {
-                Log.e(TAG, "Error updating app widget $appWidgetId: ${e.message}", e)
+                Log.e(TAG, "Error updating widget $appWidgetId: ${e.message}", e)
             }
         }
     }
@@ -134,6 +137,12 @@ class NetGuardWidgetProvider : AppWidgetProvider() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
+        Log.i(TAG, "First widget added to home screen")
         updateAllWidgets(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        Log.i(TAG, "Last widget removed from home screen")
     }
 }

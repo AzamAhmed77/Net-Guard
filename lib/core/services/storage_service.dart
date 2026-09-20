@@ -424,5 +424,34 @@ class StorageService {
       };
     }
   }
-}
+  // ── Terminal Logs Persistence ──
+  static const String _keyTerminalLogs = 'cybnux_terminal_logs';
 
+  static Future<void> saveTerminalLogs(List<Map<String, String>> logs) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Keep up to 200 persistent logs
+      final toSave = logs.take(200).toList();
+      await prefs.setString(_keyTerminalLogs, json.encode(toSave));
+    } catch (_) {}
+  }
+
+  static Future<List<Map<String, String>>> loadTerminalLogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString(_keyTerminalLogs);
+      if (str != null && str.isNotEmpty) {
+        final List<dynamic> decoded = json.decode(str);
+        return decoded.map((e) => Map<String, String>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<void> clearTerminalLogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyTerminalLogs);
+    } catch (_) {}
+  }
+}

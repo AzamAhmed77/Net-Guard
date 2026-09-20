@@ -7,7 +7,6 @@ import 'permissions_modal.dart';
 import 'about_modal.dart';
 import 'expert_settings_modal.dart';
 import 'live_logs_modal.dart';
-import '../widgets/hotspot_qr_dialog.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -103,124 +102,10 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // ==========================================
-          // 2. CUSTOM PROFILE SETTINGS
-          // ==========================================
-          _buildSectionHeader(strings.customProfileTitle.toUpperCase()),
-          _buildCard(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Icon(Icons.app_settings_alt_rounded, color: AppColors.accent, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  strings.customProfileCardTitle,
-                                  style: const TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceHover,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.borderDark),
-                          ),
-                          child: Text(
-                            '${vpn.customizedAppsCount} ${vpn.isArabic ? "تطبيق مخصص" : "Custom Apps"}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.accent,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      strings.customProfileDesc,
-                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.4),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 42,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                await vpn.saveCustomProfileSettings();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.surfaceHover,
-                                foregroundColor: AppColors.accent,
-                                elevation: 0,
-                                side: const BorderSide(color: AppColors.borderDark),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              icon: const Icon(Icons.save_rounded, size: 18),
-                              label: Text(
-                                strings.saveCustomProfileBtn,
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          height: 42,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await vpn.restoreAndApplyCustomProfile();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.surfaceHover,
-                              foregroundColor: const Color(0xFF8B5CF6),
-                              elevation: 0,
-                              side: const BorderSide(color: AppColors.borderDark),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            icon: const Icon(Icons.restore_rounded, size: 18),
-                            label: Text(
-                              strings.isAr ? 'استعادة' : 'Restore',
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
+
 
           // ==========================================
-          // 3. MONITOR & PROTECTION
+          // 2. MONITOR & PROTECTION
           // ==========================================
           _buildSectionHeader(strings.monitorProtectionSection),
           _buildCard(
@@ -261,94 +146,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 20),
 
           // ==========================================
-          // 4. HOTSPOT SPEED CONTROLLER
-          // ==========================================
-          _buildSectionHeader(strings.hotspotSectionTitle),
-          _buildCard(
-            children: [
-              _buildSwitchTile(
-                icon: Icons.wifi_tethering_rounded,
-                title: strings.hotspotControllerTitle,
-                subtitle: vpn.isHotspotRunning
-                    ? (vpn.isArabic ? 'الخدمة تعمل 🟢 (مستقلة عن VPN)' : 'Service ON 🟢 (Independent)')
-                    : (vpn.isArabic ? 'الخدمة متوقفة ⚪ (ميزة اختيارية منفصلة)' : 'Service OFF ⚪ (Optional)'),
-                value: vpn.isHotspotRunning,
-                onChanged: (_) => vpn.toggleHotspotProxy(),
-              ),
-              if (vpn.isHotspotRunning) ...[
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: AppColors.accent, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          strings.hotspotIndependentNote,
-                          style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              const Divider(color: AppColors.borderDark, height: 1),
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      vpn.isArabic ? 'تحديد سرعة البث للأجهزة المتصلة:' : 'Select Speed Limit for Devices:',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _buildHotspotSpeedChip(64, '64 KB/s', vpn),
-                        _buildHotspotSpeedChip(128, '128 KB/s', vpn),
-                        _buildHotspotSpeedChip(256, '256 KB/s', vpn),
-                        _buildHotspotSpeedChip(512, '512 KB/s', vpn),
-                        _buildHotspotSpeedChip(1024, '1 MB/s', vpn),
-                        _buildHotspotSpeedChip(2048, '2 MB/s', vpn),
-                        _buildHotspotSpeedChip(-1, vpn.isArabic ? 'مفتوح (∞)' : 'Unlimited (∞)', vpn),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(color: AppColors.borderDark, height: 1),
-              ListTile(
-                leading: Icon(Icons.qr_code_2_rounded, color: AppColors.accent, size: 20),
-                title: Text(
-                  strings.hotspotQrCodeBtn,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                ),
-                subtitle: Text(
-                  vpn.isArabic ? 'مسح سريع لربط أجهزة الضيوف تلقائياً' : 'Quick scan to connect guest devices',
-                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
-                onTap: () => showHotspotQrDialog(context, strings),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // ==========================================
-          // 4.5. SMART AUTOMATION & SCHEDULE
+          // 4. SMART AUTOMATION & SCHEDULE
           // ==========================================
           _buildSectionHeader(strings.scheduleSection),
           _buildCard(
@@ -860,30 +658,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHotspotSpeedChip(int kbps, String label, VpnManager vpn) {
-    final isSelected = vpn.hotspotDownloadLimitKbps == kbps;
-    return ChoiceChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? Colors.white : AppColors.textSecondary,
-        ),
-      ),
-      selected: isSelected,
-      selectedColor: AppColors.accent,
-      backgroundColor: AppColors.surfaceHover,
-      side: BorderSide(
-        color: isSelected ? AppColors.accent : AppColors.borderDark,
-      ),
-      onSelected: (selected) {
-        if (selected) {
-          vpn.setHotspotLimits(downloadKbps: kbps, uploadKbps: kbps);
-        }
-      },
-    );
-  }
 
   Widget _buildTimePickerTile({
     required BuildContext context,

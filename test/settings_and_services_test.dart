@@ -103,6 +103,42 @@ void main() {
       expect(restored.uploadSpeedLimit, 256);
       expect(restored.presetMode, 'custom');
       expect(restored.globalMode, 'whitelist');
+    });    test('Terminal logs persistence: save, load, and clear', () async {
+      final logs = [
+        {'time': '10:00:00', 'level': 'INFO', 'msg': 'VPN service started'},
+        {'time': '10:00:05', 'level': 'WARN', 'msg': 'High data spike detected'},
+        {'time': '10:00:10', 'level': 'OK', 'msg': 'Custom settings applied'},
+      ];
+
+      await StorageService.saveTerminalLogs(logs);
+      final loaded = await StorageService.loadTerminalLogs();
+      expect(loaded.length, 3);
+      expect(loaded[0]['msg'], 'VPN service started');
+      expect(loaded[1]['level'], 'WARN');
+      expect(loaded[2]['level'], 'OK');
+
+      await StorageService.clearTerminalLogs();
+      final afterClear = await StorageService.loadTerminalLogs();
+      expect(afterClear, isEmpty);
+    });
+
+    test('Schedule settings persist and load accurately', () async {
+      await StorageService.saveScheduleSettings(
+        enabled: true,
+        startHour: 23,
+        startMinute: 30,
+        endHour: 7,
+        endMinute: 15,
+        action: 'eco',
+      );
+
+      final sched = await StorageService.loadScheduleSettings();
+      expect(sched['enabled'], isTrue);
+      expect(sched['startHour'], 23);
+      expect(sched['startMinute'], 30);
+      expect(sched['endHour'], 7);
+      expect(sched['endMinute'], 15);
+      expect(sched['action'], 'eco');
     });
   });
 }

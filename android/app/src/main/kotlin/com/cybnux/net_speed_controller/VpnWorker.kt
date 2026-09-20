@@ -7,10 +7,15 @@ import android.util.Log
 import java.io.FileDescriptor
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.Socket
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLSocketFactory
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
@@ -32,7 +37,7 @@ class UdpEntry(
     val ch: DatagramChannel,
     val srcAddr: ByteArray, val srcPort: Int,
     val dstAddr: ByteArray, val dstPort: Int,
-    val packageName: String?,
+    var packageName: String? = null,
     var key: SelectionKey? = null,
     var lastMs: Long = System.currentTimeMillis()
 )
@@ -46,7 +51,7 @@ class TcpEntry(
     var mySeq: Long,
     var myAck: Long,
     var state: TState,
-    val packageName: String?,
+    var packageName: String? = null,
     var key: SelectionKey? = null,
     var lastMs: Long = System.currentTimeMillis()
 ) {
@@ -164,6 +169,12 @@ class VpnWorker(private val vpnService: VpnService) {
     @Volatile private var dohUrl: String = "https://cloudflare-dns.com/dns-query"
     @Volatile private var ipv6Protection: Boolean = true
     private val dohExecutor = Executors.newFixedThreadPool(4)
+    private val dohBootstrapMap = mapOf(
+        "dns.adguard-dns.com" to byteArrayOf(94.toByte(), 140.toByte(), 14, 14),
+        "cloudflare-dns.com" to byteArrayOf(1, 1, 1, 1),
+        "dns.google" to byteArrayOf(8, 8, 8, 8),
+        "dns.quad9.net" to byteArrayOf(9, 9, 9, 9)
+    )
 
     // Direct buffer recycling pool for eBPF Zero-Copy packet fast-path
     private val bufferPool = ConcurrentLinkedQueue<ByteArray>()
@@ -179,6 +190,9 @@ class VpnWorker(private val vpnService: VpnService) {
     @Volatile private var dataCapBytes: Long = 0L // 0 = unlimited
     @Volatile private var dataCapAction: String = "throttle" // "throttle" or "disconnect"
     @Volatile private var isDataCapExceeded: Boolean = false
+    @Volatile private var alert50Sent: Boolean = false
+    @Volatile private var alert75Sent: Boolean = false
+    @Volatile private var alert90Sent: Boolean = false
     @Volatile private var isNetworkBlocked: Boolean = false // حظر الشبكة بسبب الكوتا (بدون إيقاف الخدمة)
     @Volatile private var isGamingMode: Boolean = false // وضع الألعاب: استجابة فائقة بدون تأخير حزم
 
@@ -358,6 +372,10 @@ class VpnWorker(private val vpnService: VpnService) {
         val totalUsage = MyVpnService.totalRxBytes + MyVpnService.totalTxBytes
         if (capBytes <= 0 || totalUsage < capBytes) {
             (vpnService as? MyVpnService)?.resetDataCapBlock()
+            isDataCapExceeded = false
+            alert50Sent = false
+            alert75Sent = false
+            alert90Sent = false
         }
 
         Log.i(TAG, "Worker settings updated. Closing blocked connections only.")
@@ -366,10 +384,17 @@ class VpnWorker(private val vpnService: VpnService) {
         val tcpKeys = tcpTable.keys.toList()
         for (key in tcpKeys) {
             val entry = tcpTable[key] ?: continue
-            val pkg = entry.packageName
+            var pkg = entry.packageName
+            if (pkg == null) {
+                val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_TCP, entry.srcAddr, entry.srcPort, entry.dstAddr, entry.dstPort)
+                pkg = getPackageNameForUid(uid)
+                if (pkg != null) entry.packageName = pkg
+            }
             val isMuted = pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L
-            if (pkg != null && (isAppBlockedByFirewall(pkg) || isMuted)) {
-                Log.i(TAG, "Closing newly blocked/muted TCP connection: $pkg")
+            val isBlocked = if (pkg != null) isAppBlockedByFirewall(pkg) || isMuted else (firewallBlockAll || isMuted)
+            if (isBlocked) {
+                Log.i(TAG, "Closing newly blocked/muted TCP connection: ${pkg ?: "UNKNOWN"}")
+                rstTo(entry.dstAddr, entry.srcAddr, entry.dstPort, entry.srcPort, entry.myAck, entry.mySeq)
                 try { entry.ch.close() } catch (_: Exception) {}
                 try { entry.key?.cancel() } catch (_: Exception) {}
                 tcpTable.remove(key)
@@ -378,18 +403,29 @@ class VpnWorker(private val vpnService: VpnService) {
         val udpKeys = udpTable.keys.toList()
         for (key in udpKeys) {
             val entry = udpTable[key] ?: continue
-            val pkg = entry.packageName
+            var pkg = entry.packageName
+            if (pkg == null) {
+                val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_UDP, entry.srcAddr, entry.srcPort, entry.dstAddr, entry.dstPort)
+                pkg = getPackageNameForUid(uid)
+                if (pkg != null) entry.packageName = pkg
+            }
             val isMuted = pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L
-            if (pkg != null && (isAppBlockedByFirewall(pkg) || isMuted)) {
-                Log.i(TAG, "Closing newly blocked/muted UDP channel: $pkg")
+            val isBlocked = if (pkg != null) isAppBlockedByFirewall(pkg) || isMuted else (firewallBlockAll || isMuted)
+            if (isBlocked) {
+                Log.i(TAG, "Closing newly blocked/muted UDP channel: ${pkg ?: "UNKNOWN"}")
                 try { entry.ch.close() } catch (_: Exception) {}
                 try { entry.key?.cancel() } catch (_: Exception) {}
                 udpTable.remove(key)
             }
         }
+        socketUidCache.clear()
+        nextAppDlSendTimeMs.clear()
         refillTokens()
         resumePausedTcpReaders()
         selector?.wakeup()
+        synchronized(queueLock) {
+            queueLock.notifyAll()
+        }
     }
 
     fun updateAppSpeedConfigs(configJson: String) {
@@ -449,9 +485,17 @@ class VpnWorker(private val vpnService: VpnService) {
             val activeTcpKeys = tcpTable.keys.toList()
             for (key in activeTcpKeys) {
                 val entry = tcpTable[key] ?: continue
-                val pkg = entry.packageName
-                if (pkg != null && modes[pkg] == "custom" && dlLimits[pkg] == 0L) {
-                    Log.i(TAG, "Closing newly muted TCP connection: $pkg")
+                var pkg = entry.packageName
+                if (pkg == null) {
+                    val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_TCP, entry.srcAddr, entry.srcPort, entry.dstAddr, entry.dstPort)
+                    pkg = getPackageNameForUid(uid)
+                    if (pkg != null) entry.packageName = pkg
+                }
+                val isMuted = (pkg != null && modes[pkg] == "custom" && dlLimits[pkg] == 0L)
+                val isBlocked = if (pkg != null) isAppBlockedByFirewall(pkg) || isMuted else (firewallBlockAll || isMuted)
+                if (isBlocked) {
+                    Log.i(TAG, "Closing newly muted/blocked TCP connection: ${pkg ?: "UNKNOWN"}")
+                    rstTo(entry.dstAddr, entry.srcAddr, entry.dstPort, entry.srcPort, entry.myAck, entry.mySeq)
                     try { entry.ch.close() } catch (_: Exception) {}
                     try { entry.key?.cancel() } catch (_: Exception) {}
                     tcpTable.remove(key)
@@ -460,15 +504,23 @@ class VpnWorker(private val vpnService: VpnService) {
             val activeUdpKeys = udpTable.keys.toList()
             for (key in activeUdpKeys) {
                 val entry = udpTable[key] ?: continue
-                val pkg = entry.packageName
-                if (pkg != null && modes[pkg] == "custom" && dlLimits[pkg] == 0L) {
-                    Log.i(TAG, "Closing newly muted UDP channel: $pkg")
+                var pkg = entry.packageName
+                if (pkg == null) {
+                    val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_UDP, entry.srcAddr, entry.srcPort, entry.dstAddr, entry.dstPort)
+                    pkg = getPackageNameForUid(uid)
+                    if (pkg != null) entry.packageName = pkg
+                }
+                val isMuted = (pkg != null && modes[pkg] == "custom" && dlLimits[pkg] == 0L)
+                val isBlocked = if (pkg != null) isAppBlockedByFirewall(pkg) || isMuted else (firewallBlockAll || isMuted)
+                if (isBlocked) {
+                    Log.i(TAG, "Closing newly muted/blocked UDP channel: ${pkg ?: "UNKNOWN"}")
                     try { entry.ch.close() } catch (_: Exception) {}
                     try { entry.key?.cancel() } catch (_: Exception) {}
                     udpTable.remove(key)
                 }
             }
-
+            socketUidCache.clear()
+            nextAppDlSendTimeMs.clear()
             Log.i(TAG, "App speed configs updated: ${modes.size} apps configured")
             refillTokens()
             resumePausedTcpReaders()
@@ -487,11 +539,11 @@ class VpnWorker(private val vpnService: VpnService) {
         if (capUL > 0) {
             if (ulRefill == 0L) {
                 ulRefill = now
-                ulTokens = Math.max(capUL, 65536L) // Ensure a minimum bucket size of 64KB to avoid TCP stalling
+                ulTokens = minOf(capUL, 16384L)
             } else {
                 val dt = now - ulRefill
                 if (dt > 0) {
-                    ulTokens = minOf(capUL * 2, ulTokens + (dt * capUL) / 1000)
+                    ulTokens = minOf(capUL, ulTokens + (dt * capUL) / 1000L)
                     ulRefill = now
                 }
             }
@@ -504,11 +556,11 @@ class VpnWorker(private val vpnService: VpnService) {
         if (capDL > 0) {
             if (dlRefill == 0L) {
                 dlRefill = now
-                dlTokens = Math.max(capDL, 65536L)
+                dlTokens = minOf(capDL, 16384L)
             } else {
                 val dt = now - dlRefill
                 if (dt > 0) {
-                    dlTokens = minOf(capDL * 2, dlTokens + (dt * capDL) / 1000)
+                    dlTokens = minOf(capDL, dlTokens + (dt * capDL) / 1000L)
                     dlRefill = now
                 }
             }
@@ -519,9 +571,23 @@ class VpnWorker(private val vpnService: VpnService) {
     }
 
     private fun checkDataCap(bytesAdded: Int) {
-        if (dataCapBytes <= 0 || isDataCapExceeded) return
+        if (dataCapBytes <= 0) return
         val total = MyVpnService.totalRxBytes + MyVpnService.totalTxBytes
-        if (total >= dataCapBytes) {
+        val pct = (total.toDouble() / dataCapBytes.toDouble()) * 100.0
+
+        if (pct >= 50.0 && !alert50Sent) {
+            alert50Sent = true
+            (vpnService as? MyVpnService)?.triggerDataCapMilestone(50, total, dataCapBytes)
+        }
+        if (pct >= 75.0 && !alert75Sent) {
+            alert75Sent = true
+            (vpnService as? MyVpnService)?.triggerDataCapMilestone(75, total, dataCapBytes)
+        }
+        if (pct >= 90.0 && !alert90Sent) {
+            alert90Sent = true
+            (vpnService as? MyVpnService)?.triggerDataCapMilestone(90, total, dataCapBytes)
+        }
+        if (total >= dataCapBytes && !isDataCapExceeded) {
             isDataCapExceeded = true
             handleDataCapExceeded()
         }
@@ -640,8 +706,7 @@ class VpnWorker(private val vpnService: VpnService) {
             sendTime = now
         }
 
-        if (pkg != null) addAppUsage(pkg, pkt.size.toLong())
-
+        // App usage is accurately counted in onInTcp / onInUdp payload reads to prevent 2x double counting
         toDeviceQueue.add(ScheduledPacket(pkt, sendTime))
         synchronized(queueLock) {
             queueLock.notifyAll()
@@ -925,11 +990,14 @@ class VpnWorker(private val vpnService: VpnService) {
                 }
             }
 
-            // Encrypted DNS (DoH) via HTTPS
-            if (dohEnabled && dohUrl.isNotBlank()) {
+            // Encrypted DNS (DoH) via HTTPS (Bypass if query is for the DoH server itself to prevent recursive deadlock)
+            if (dohEnabled && dohUrl.isNotBlank() && !isDohHostQuery(domain)) {
                 queryDoh(dnsQuery) { respBytes ->
                     if (respBytes != null && running.get()) {
                         queueDownloadPacket(buildUdp(dA, sA, dP, sP, respBytes))
+                    } else if (running.get()) {
+                        // Crucial fallback: If DoH fails or times out, immediately resolve via direct protected UDP
+                        forwardDnsUdpDirect(sA, dA, sP, dP, dnsQuery)
                     }
                 }
                 return
@@ -980,7 +1048,23 @@ class VpnWorker(private val vpnService: VpnService) {
         e.lastMs = System.currentTimeMillis()
 
         // Apply non-blocking upload UDP limit (Drop if out of tokens)
-        val pkg = e.packageName
+        var pkg = e.packageName
+        if (pkg == null) {
+            val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_UDP, sA, sP, dA, dP)
+            pkg = getPackageNameForUid(uid)
+            if (pkg != null) e.packageName = pkg
+        }
+        val isMuted = (pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L) ||
+                      (downloadBps == 0L && uploadBps == 0L && shouldThrottleApp(pkg))
+        val isBlocked = if (pkg != null) {
+            isAppBlockedByFirewall(pkg) || isMuted
+        } else {
+            firewallBlockAll || isMuted
+        }
+        if (isBlocked) {
+            removeUdp(key, e)
+            return
+        }
         val shouldThrottle = shouldThrottleApp(pkg)
         if (shouldThrottle) {
             val appLimiter = if (pkg != null) getAppUlLimiter(pkg) else null
@@ -1013,6 +1097,20 @@ class VpnWorker(private val vpnService: VpnService) {
     }
 
     private fun onInUdp(e: UdpEntry) {
+        var udpInPkg = e.packageName
+        if (udpInPkg == null) {
+            val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_UDP, e.srcAddr, e.srcPort, e.dstAddr, e.dstPort)
+            udpInPkg = getPackageNameForUid(uid)
+            if (udpInPkg != null) e.packageName = udpInPkg
+        }
+        val udpInMuted = (udpInPkg != null && appSpeedModes[udpInPkg] == "custom" && (appDlLimits[udpInPkg] ?: -1L) == 0L) ||
+                         (downloadBps == 0L && uploadBps == 0L && shouldThrottleApp(udpInPkg))
+        val udpInBlocked = if (udpInPkg != null) isAppBlockedByFirewall(udpInPkg) || udpInMuted else (firewallBlockAll || udpInMuted)
+        if (udpInBlocked) {
+            val key = "${e.srcAddr.hex()}:${e.srcPort}>${e.dstAddr.hex()}:${e.dstPort}"
+            removeUdp(key, e)
+            return
+        }
         val buf = ByteBuffer.allocate(MTU)
         try {
             val n = e.ch.read(buf); if (n <= 0) return
@@ -1021,6 +1119,7 @@ class VpnWorker(private val vpnService: VpnService) {
             MyVpnService.totalRxBytes += n
             rxBytesThisSecond += n
             checkDataCap(n)
+            if (udpInPkg != null) addAppUsage(udpInPkg, n.toLong())
 
             val payload = if (e.dstPort == 53 && dnsRebindingProtection) {
                 sanitizeDnsRebindingResponse(data)
@@ -1028,7 +1127,7 @@ class VpnWorker(private val vpnService: VpnService) {
                 data
             }
 
-            queueDownloadPacket(buildUdp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort, payload), e.packageName)
+            queueDownloadPacket(buildUdp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort, payload), udpInPkg)
             
             // Fast close ephemeral DNS query sockets upon receiving response
             if (e.dstPort == 53) {
@@ -1120,6 +1219,24 @@ class VpnWorker(private val vpnService: VpnService) {
 
         val e = tcpTable[key] ?: return
         e.lastMs = System.currentTimeMillis()
+        var pkg = e.packageName
+        if (pkg == null) {
+            val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_TCP, sA, sP, dA, dP)
+            pkg = getPackageNameForUid(uid)
+            if (pkg != null) e.packageName = pkg
+        }
+        val isMuted = (pkg != null && appSpeedModes[pkg] == "custom" && (appDlLimits[pkg] ?: -1L) == 0L) ||
+                      (downloadBps == 0L && uploadBps == 0L && shouldThrottleApp(pkg))
+        val isBlocked = if (pkg != null) {
+            isAppBlockedByFirewall(pkg) || isMuted
+        } else {
+            firewallBlockAll || isMuted
+        }
+        if (isBlocked) {
+            rstTo(dA, sA, dP, sP, ack, seq + 1)
+            removeTcp(key)
+            return
+        }
 
         if (fl and ACK != 0 && e.state == TState.SYN_RECV) {
             e.state = TState.ESTABLISHED
@@ -1260,6 +1377,20 @@ class VpnWorker(private val vpnService: VpnService) {
     private fun onInTcp(e: TcpEntry) {
         if (e.state != TState.ESTABLISHED && e.state != TState.SYN_RECV) return
         e.lastMs = System.currentTimeMillis()
+        var inPkg = e.packageName
+        if (inPkg == null) {
+            val uid = resolveSocketUid(android.system.OsConstants.IPPROTO_TCP, e.srcAddr, e.srcPort, e.dstAddr, e.dstPort)
+            inPkg = getPackageNameForUid(uid)
+            if (inPkg != null) e.packageName = inPkg
+        }
+        val inMuted = (inPkg != null && appSpeedModes[inPkg] == "custom" && (appDlLimits[inPkg] ?: -1L) == 0L) ||
+                      (downloadBps == 0L && uploadBps == 0L && shouldThrottleApp(inPkg))
+        val inBlocked = if (inPkg != null) isAppBlockedByFirewall(inPkg) || inMuted else (firewallBlockAll || inMuted)
+        if (inBlocked) {
+            val key = "${e.srcAddr.hex()}:${e.srcPort}>${e.dstAddr.hex()}:${e.dstPort}"
+            removeTcp(key)
+            return
+        }
 
         val pkg = e.packageName
         val shouldThrottle = shouldThrottleApp(pkg)
@@ -1302,6 +1433,7 @@ class VpnWorker(private val vpnService: VpnService) {
             MyVpnService.totalRxBytes += n
             rxBytesThisSecond += n
             checkDataCap(n)
+            if (inPkg != null) addAppUsage(inPkg, n.toLong())
 
             // Deduct tokens and apply immediate backpressure if bucket is depleted
             if (shouldThrottle) {
@@ -1312,7 +1444,7 @@ class VpnWorker(private val vpnService: VpnService) {
                     }
                 } else if (downloadBps > 0) {
                     synchronized(this) {
-                        dlTokens = maxOf(0L, dlTokens - n)
+                        dlTokens = maxOf(-downloadBps, dlTokens - n)
                         if (dlTokens <= 0) {
                             pauseTcpReader(e)
                         }
@@ -1321,7 +1453,7 @@ class VpnWorker(private val vpnService: VpnService) {
             }
 
             queueDownloadPacket(buildTcp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort,
-                e.mySeq, e.myAck, ACK or PSH, data), e.packageName)
+                e.mySeq, e.myAck, ACK or PSH, data), inPkg)
             e.mySeq += n
         } catch (ex: Exception) {
             Log.w(TAG, "TCP recv err: ${ex.message}")
@@ -1451,7 +1583,7 @@ class VpnWorker(private val vpnService: VpnService) {
             -1
         }
         if (socketUidCache.size > 2000) socketUidCache.clear()
-        socketUidCache[cacheKey] = uid
+        if (uid > 0) socketUidCache[cacheKey] = uid
         return uid
     }
 
@@ -1476,7 +1608,7 @@ class VpnWorker(private val vpnService: VpnService) {
 
     private fun isWifiConnected(): Boolean {
         val now = System.currentTimeMillis()
-        if (now - lastWifiCheckMs < 5000L) {
+        if (now - lastWifiCheckMs < 1000L) {
             return cachedIsWifi
         }
         lastWifiCheckMs = now
@@ -1484,21 +1616,18 @@ class VpnWorker(private val vpnService: VpnService) {
         cachedIsWifi = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 var wifiFound = false
-                val activeNet = cm.activeNetwork
-                val activeCaps = cm.getNetworkCapabilities(activeNet)
-                if (activeCaps != null && activeCaps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
-                    wifiFound = true
-                } else {
-                    val allNetworks = cm.allNetworks
-                    for (network in allNetworks) {
-                        val caps = cm.getNetworkCapabilities(network) ?: continue
-                        if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
-                        if (caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
-                            wifiFound = true
-                            break
-                        }
+                val allNetworks = cm.allNetworks
+                for (network in allNetworks) {
+                    val caps = cm.getNetworkCapabilities(network) ?: continue
+                    if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
+                    if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
+                        wifiFound = true
+                        break
                     }
+                }
+                if (!wifiFound) {
+                    @Suppress("DEPRECATION")
+                    wifiFound = cm.getNetworkInfo(android.net.ConnectivityManager.TYPE_WIFI)?.isConnected == true
                 }
                 wifiFound
             } else {
@@ -1566,7 +1695,7 @@ class VpnWorker(private val vpnService: VpnService) {
         val limit = appDlLimits[pkg] ?: return null
         if (limit < 0) return null
         return appDlLimiters.getOrPut(pkg) { RateLimiter(limit) }.apply {
-            if (this.limitBps != limit) this.limitBps = limit
+            if (this.limitBps != limit) updateLimit(limit)
         }
     }
 
@@ -1575,7 +1704,7 @@ class VpnWorker(private val vpnService: VpnService) {
         val limit = appUlLimits[pkg] ?: return null
         if (limit < 0) return null
         return appUlLimiters.getOrPut(pkg) { RateLimiter(limit) }.apply {
-            if (this.limitBps != limit) this.limitBps = limit
+            if (this.limitBps != limit) updateLimit(limit)
         }
     }
 
@@ -1885,6 +2014,57 @@ class VpnWorker(private val vpnService: VpnService) {
         return resp
     }
 
+    private fun isDohHostQuery(domain: String?): Boolean {
+        if (domain == null) return false
+        val dom = domain.lowercase().trim()
+        val dohHost = try {
+            if (dohUrl.isNotBlank()) URL(dohUrl).host.lowercase().trim() else ""
+        } catch (_: Exception) { "" }
+
+        return dom.contains("adguard-dns.com") ||
+               dom.contains("cloudflare-dns.com") ||
+               dom.contains("dns.google") ||
+               dom.contains("quad9.net") ||
+               (dohHost.isNotBlank() && (dom == dohHost || dom.endsWith(".$dohHost")))
+    }
+
+    private fun forwardDnsUdpDirect(sA: ByteArray, dA: ByteArray, sP: Int, dP: Int, dnsQuery: ByteArray) {
+        dohExecutor.execute {
+            var socket: DatagramSocket? = null
+            try {
+                socket = DatagramSocket()
+                vpnService.protect(socket)
+                socket.soTimeout = 2500
+                val targetIp = try {
+                    val ip = InetAddress.getByAddress(dA)
+                    if (ip.isAnyLocalAddress || ip.isLoopbackAddress || ip.isSiteLocalAddress) {
+                        InetAddress.getByName("8.8.8.8")
+                    } else {
+                        ip
+                    }
+                } catch (_: Exception) {
+                    InetAddress.getByName("8.8.8.8")
+                }
+                val sendPkt = DatagramPacket(dnsQuery, dnsQuery.size, targetIp, 53)
+                socket.send(sendPkt)
+
+                val buf = ByteArray(1500)
+                val recvPkt = DatagramPacket(buf, buf.size)
+                socket.receive(recvPkt)
+
+                if (running.get() && recvPkt.length > 0) {
+                    val respBytes = buf.copyOf(recvPkt.length)
+                    val sanitized = if (dnsRebindingProtection) sanitizeDnsRebindingResponse(respBytes) else respBytes
+                    queueDownloadPacket(buildUdp(dA, sA, dP, sP, sanitized))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "DNS direct UDP fallback failed: ${e.message}")
+            } finally {
+                try { socket?.close() } catch (_: Exception) {}
+            }
+        }
+    }
+
     private fun queryDoh(dnsQuery: ByteArray, onResponse: (ByteArray?) -> Unit) {
         dohExecutor.execute {
             var conn: HttpURLConnection? = null
@@ -1892,9 +2072,43 @@ class VpnWorker(private val vpnService: VpnService) {
                 val endpoint = if (dohUrl.isNotBlank()) dohUrl else "https://cloudflare-dns.com/dns-query"
                 val url = URL(endpoint)
                 conn = url.openConnection() as HttpURLConnection
+                if (conn is HttpsURLConnection) {
+                    val defaultFactory = HttpsURLConnection.getDefaultSSLSocketFactory()
+                    conn.sslSocketFactory = object : SSLSocketFactory() {
+                        override fun getDefaultCipherSuites(): Array<String> = defaultFactory.defaultCipherSuites
+                        override fun getSupportedCipherSuites(): Array<String> = defaultFactory.supportedCipherSuites
+                        override fun createSocket(s: Socket, host: String, port: Int, autoClose: Boolean): Socket {
+                            vpnService.protect(s)
+                            return defaultFactory.createSocket(s, host, port, autoClose)
+                        }
+                        override fun createSocket(host: String, port: Int): Socket {
+                            val ip = dohBootstrapMap[host.lowercase().trim()]
+                            val addr = if (ip != null) InetAddress.getByAddress(host, ip) else InetAddress.getByName(host)
+                            val s = Socket()
+                            vpnService.protect(s)
+                            s.connect(InetSocketAddress(addr, port), 1500)
+                            return defaultFactory.createSocket(s, host, port, true)
+                        }
+                        override fun createSocket(host: String, port: Int, localHost: InetAddress, localPort: Int): Socket {
+                            val s = defaultFactory.createSocket(host, port, localHost, localPort)
+                            vpnService.protect(s)
+                            return s
+                        }
+                        override fun createSocket(host: InetAddress, port: Int): Socket {
+                            val s = defaultFactory.createSocket(host, port)
+                            vpnService.protect(s)
+                            return s
+                        }
+                        override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress, localPort: Int): Socket {
+                            val s = defaultFactory.createSocket(address, port, localAddress, localPort)
+                            vpnService.protect(s)
+                            return s
+                        }
+                    }
+                }
                 conn.requestMethod = "POST"
-                conn.connectTimeout = 3000
-                conn.readTimeout = 3000
+                conn.connectTimeout = 1500
+                conn.readTimeout = 1500
                 conn.doOutput = true
                 conn.doInput = true
                 conn.useCaches = false
@@ -1906,7 +2120,8 @@ class VpnWorker(private val vpnService: VpnService) {
                 }
                 if (conn.responseCode == 200) {
                     val respBytes = conn.inputStream.use { it.readBytes() }
-                    onResponse(respBytes)
+                    val sanitized = if (dnsRebindingProtection) sanitizeDnsRebindingResponse(respBytes) else respBytes
+                    onResponse(sanitized)
                 } else {
                     onResponse(null)
                 }
@@ -2122,14 +2337,14 @@ class VpnWorker(private val vpnService: VpnService) {
 }
 
 class RateLimiter(var limitBps: Long) {
-    private var tokens: Long = if (limitBps > 0) Math.max(limitBps, 65536L) else 0L
+    private var tokens: Long = if (limitBps > 0) minOf(limitBps, 16384L) else 0L
     private var lastRefill: Long = System.currentTimeMillis()
 
     @Synchronized
     fun updateLimit(newLimitBps: Long) {
         limitBps = newLimitBps
         lastRefill = System.currentTimeMillis()
-        tokens = if (newLimitBps > 0) Math.max(newLimitBps, 65536L) else 0L
+        tokens = if (newLimitBps > 0) minOf(newLimitBps, 16384L) else 0L
     }
 
     @Synchronized
@@ -2137,7 +2352,7 @@ class RateLimiter(var limitBps: Long) {
         val now = System.currentTimeMillis()
         val dt = now - lastRefill
         if (dt > 0 && limitBps > 0) {
-            tokens = minOf(limitBps * 2, tokens + (dt * limitBps) / 1000)
+            tokens = minOf(limitBps, tokens + (dt * limitBps) / 1000L)
             lastRefill = now
         }
     }
@@ -2163,7 +2378,8 @@ class RateLimiter(var limitBps: Long) {
     @Synchronized
     fun consumeTokens(bytes: Long) {
         if (limitBps > 0) {
-            tokens = maxOf(0L, tokens - bytes)
+            // Retain negative deficit so overdrawing tokens must be paid back before reading more!
+            tokens = maxOf(-limitBps, tokens - bytes)
         }
     }
 }

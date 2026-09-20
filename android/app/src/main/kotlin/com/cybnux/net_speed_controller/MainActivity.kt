@@ -1,4 +1,4 @@
-package com.cybnux.net_speed_controller
+﻿package com.cybnux.net_speed_controller
 
 import android.app.Activity
 import android.app.AppOpsManager
@@ -55,6 +55,35 @@ class MainActivity: FlutterActivity() {
     private var pendingDohEnabled: Boolean = false
     private var pendingDohUrl: String = ""
     private var pendingIpv6Protection: Boolean = true
+    
+    // Cached NetworkStatsManager baseline to avoid expensive IPC queries on rapid tickers
+    private var lastNsmCacheTimeMs: Long = 0L
+    private var cachedNsmBytesMap = HashMap<String, Double>()
+
+    private fun isWifiConnected(): Boolean {
+        return try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val allNetworks = cm.allNetworks
+                for (network in allNetworks) {
+                    val caps = cm.getNetworkCapabilities(network) ?: continue
+                    if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) continue
+                    if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                        return true
+                    }
+                }
+                @Suppress("DEPRECATION")
+                val wifiInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI)
+                wifiInfo?.isConnected == true
+            } else {
+                @Suppress("DEPRECATION")
+                val wifiInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI)
+                wifiInfo?.isConnected == true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
     
     private var methodResult: MethodChannel.Result? = null
     private var flutterChannel: MethodChannel? = null
@@ -299,7 +328,10 @@ class MainActivity: FlutterActivity() {
                                     map["appName"] = appInfo.loadLabel(pm).toString()
                                     map["uid"] = appInfo.uid
                                     
-                                    val realTodayBytes = todayUidBytes[appInfo.uid] ?: 0L
+                                    val liveUsage = MyVpnService.instance?.getPerAppUsageMap() ?: emptyMap()
+                                    val baseBytes = todayUidBytes[appInfo.uid] ?: 0L
+                                    val liveBytes = liveUsage[pkg.packageName] ?: 0L
+                                    val realTodayBytes = baseBytes + liveBytes
                                     map["totalMb"] = realTodayBytes.toDouble() / (1024.0 * 1024.0)
                                     
                                     cachedPackageUids[pkg.packageName] = appInfo.uid
@@ -564,6 +596,16 @@ class MainActivity: FlutterActivity() {
                                         map["com.cybnux.uninstalled_apps"] = removedBytes.toDouble() / (1024.0 * 1024.0)
                                     }
 
+                                    // Inject live real-time VPN packet counters directly from VpnWorker!
+                                    val liveUsage = MyVpnService.instance?.getPerAppUsageMap() ?: emptyMap()
+                                    for ((pkg, bytes) in liveUsage) {
+                                        if (pkg == packageName) continue
+                                        val liveMb = bytes.toDouble() / (1024.0 * 1024.0)
+                                        if (liveMb > 0.0) {
+                                            val base = map[pkg] ?: 0.0
+                                            map[pkg] = base + liveMb
+                                        }
+                                    }
                                     runOnUiThread {
                                         result.success(map)
                                     }
@@ -584,6 +626,15 @@ class MainActivity: FlutterActivity() {
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error reading per-app traffic: ${e.message}")
+                        }
+                        val liveUsage = MyVpnService.instance?.getPerAppUsageMap() ?: emptyMap()
+                        for ((pkg, bytes) in liveUsage) {
+                            if (pkg == packageName) continue
+                            val liveMb = bytes.toDouble() / (1024.0 * 1024.0)
+                            if (liveMb > 0.0) {
+                                val base = map[pkg] ?: 0.0
+                                map[pkg] = base + liveMb
+                            }
                         }
                         runOnUiThread {
                             result.success(map)
@@ -1086,14 +1137,7 @@ class MainActivity: FlutterActivity() {
                                 if (session == "today") {
                                     val liveUsage = MyVpnService.instance?.getPerAppUsageMap() ?: emptyMap()
                                     val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-                                    val isWifiActive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                        val active = cm?.activeNetwork
-                                        val caps = cm?.getNetworkCapabilities(active)
-                                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        cm?.activeNetworkInfo?.type == ConnectivityManager.TYPE_WIFI
-                                    }
+                                    val isWifiActive = isWifiConnected()
 
                                     for ((pkg, bytes) in liveUsage) {
                                         if (pkg == packageName) continue
@@ -1193,67 +1237,6 @@ class MainActivity: FlutterActivity() {
                     map["todayMobileBytes"] = NetworkMonitorService.todayMobileBytes
                     result.success(map)
                 }
-                "getPerAppTraffic" -> {
-                    Thread {
-                        val map = HashMap<String, Double>()
-                        try {
-                            val nsm = getSystemService(Context.NETWORK_STATS_SERVICE) as? NetworkStatsManager
-                            if (nsm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                val cal = java.util.Calendar.getInstance().apply {
-                                    set(java.util.Calendar.HOUR_OF_DAY, 0)
-                                    set(java.util.Calendar.MINUTE, 0)
-                                    set(java.util.Calendar.SECOND, 0)
-                                    set(java.util.Calendar.MILLISECOND, 0)
-                                }
-                                val startOfDay = cal.timeInMillis
-                                val now = System.currentTimeMillis()
-                                val bucket = NetworkStats.Bucket()
-                                val uidMap = HashMap<Int, Long>()
-
-                                try {
-                                    val w = nsm.queryDetails(NetworkCapabilities.TRANSPORT_WIFI, null, startOfDay, now)
-                                    while (w.hasNextBucket()) {
-                                        w.getNextBucket(bucket)
-                                        val u = bucket.uid
-                                        if (u >= 1000) {
-                                            uidMap[u] = (uidMap[u] ?: 0L) + bucket.rxBytes + bucket.txBytes
-                                        }
-                                    }
-                                    w.close()
-                                } catch (_: Exception) {}
-
-                                try {
-                                    val c = nsm.queryDetails(NetworkCapabilities.TRANSPORT_CELLULAR, null, startOfDay, now)
-                                    while (c.hasNextBucket()) {
-                                        c.getNextBucket(bucket)
-                                        val u = bucket.uid
-                                        if (u >= 1000) {
-                                            uidMap[u] = (uidMap[u] ?: 0L) + bucket.rxBytes + bucket.txBytes
-                                        }
-                                    }
-                                    c.close()
-                                } catch (_: Exception) {}
-
-                                val pm = packageManager
-                                for ((uid, bytes) in uidMap) {
-                                    if (bytes > 0L) {
-                                        val pkgs = pm.getPackagesForUid(uid)
-                                        if (pkgs != null) {
-                                            for (pkg in pkgs) {
-                                                map[pkg] = (map[pkg] ?: 0.0) + (bytes.toDouble() / (1024.0 * 1024.0))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "getPerAppTraffic error: ${e.message}")
-                        }
-                        runOnUiThread {
-                            result.success(map)
-                        }
-                    }.start()
-                }
                 "setSpikeAlertEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: true
                     val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
@@ -1274,7 +1257,7 @@ class MainActivity: FlutterActivity() {
                 "setAppLanguage" -> {
                     val lang = call.argument<String>("language") ?: "ar"
                     val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
-                    prefs.edit().putString("app_language", lang).apply()
+                    prefs.edit().putString("app_language", lang).putString("selected_language", lang).apply()
                     NetworkMonitorService.instance?.updateNotification(force = true)
                     NetGuardTileService.requestTileUpdate(this@MainActivity)
                     NetGuardWidgetProvider.updateAllWidgets(this@MainActivity)

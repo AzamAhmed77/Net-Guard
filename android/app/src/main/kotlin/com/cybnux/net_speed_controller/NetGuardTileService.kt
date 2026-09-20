@@ -11,6 +11,7 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import android.util.Log
 import androidx.annotation.RequiresApi
+import java.util.Locale
 
 @RequiresApi(Build.VERSION_CODES.N)
 class NetGuardTileService : TileService() {
@@ -61,10 +62,22 @@ class NetGuardTileService : TileService() {
         val tile = qsTile ?: return
         try {
             val isRunning = MyVpnService.isRunning
+            val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+            val savedLang = prefs.getString("app_language", prefs.getString("selected_language", null))
+            val isAr = if (savedLang != null) {
+                savedLang == "ar"
+            } else {
+                Locale.getDefault().language == "ar"
+            }
+
             tile.state = if (isRunning) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
             tile.label = "Net Guard"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                tile.subtitle = if (isRunning) "Protected" else "Protection Off"
+                tile.subtitle = if (isRunning) {
+                    if (isAr) "محمي" else "Protected"
+                } else {
+                    if (isAr) "متوقف" else "Protection Off"
+                }
             }
             tile.icon = Icon.createWithResource(this, R.drawable.ic_notification)
             tile.updateTile()

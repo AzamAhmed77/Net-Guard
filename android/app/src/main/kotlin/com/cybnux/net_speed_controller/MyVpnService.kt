@@ -575,40 +575,108 @@ class MyVpnService : VpnService() {
         }
     }
 
+        fun triggerDataCapMilestone(percent: Int, usedBytes: Long, totalCapBytes: Long) {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+        val isEn = (prefs.getString("app_language", "ar") == "en")
+
+        val usedMb = usedBytes / (1024 * 1024)
+        val totalMb = totalCapBytes / (1024 * 1024)
+        val remainingMb = (totalCapBytes - usedBytes).coerceAtLeast(0L) / (1024 * 1024)
+
+        val title = if (isEn) "⚠️ Data Quota Alert: $percent% Used" else "⚠️ تنبيه الحصة: تم استهلاك $percent%"
+        val text = if (isEn) {
+            "$usedMb MB used of $totalMb MB ($remainingMb MB remaining)"
+        } else {
+            "تم استهلاك $usedMb ميجابايت من أصل $totalMb ميجابايت (متبقي $remainingMb ميجابايت)"
+        }
+
+        val openIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 2028 + percent, openIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        )
+
+        val builder = NotificationCompat.Builder(this, NetworkMonitorService.ALERTS_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                if (isEn) """⚠️ Data Quota Warning ($percent%):
+You have consumed $usedMb MB out of your $totalMb MB quota.
+Remaining: $remainingMb MB."""
+                else """⚠️ تحذير باقة البيانات ($percent%):
+لقد استهلكت $usedMb ميجابايت من إجمالي الحصة $totalMb ميجابايت.
+المتبقي للباقة: $remainingMb ميجابايت."""
+            ))
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+
+        manager.notify(2028 + percent, builder.build())
+    }
+
     fun triggerDataCapReached(action: String) {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
-            .setContentTitle("Net Speed Limiter")
+        val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+        val isEn = (prefs.getString("app_language", "ar") == "en")
+
+        val title = if (isEn) "🚫 Data Cap Exceeded!" else "🚫 تم بلوغ الحد الأقصى للبيانات!"
+        val text = if (action == "disconnect") {
+            if (isEn) "Data quota reached. Internet connection blocked to protect your balance."
+            else "انتهت باقة البيانات المحددة. تم إيقاف الإنترنت لحماية رصيدك."
+        } else {
+            if (isEn) "Data quota reached. Connection throttled to emergency speed."
+            else "انتهت باقة البيانات المحددة. تم خفض السرعة تلقائياً لوضع التوفير."
+        }
+
+        val openIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 2027, openIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        )
+
+        val builder = NotificationCompat.Builder(this, NetworkMonitorService.ALERTS_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                if (action == "disconnect") {
+                    if (isEn) """🚫 Quota Finished:
+All network traffic is paused according to your data cap rule."""
+                    else """🚫 نفدت الباقة المحددة:
+تم تعليق كافة حزم البيانات التزاماً بحد الباقة لتجنب أي رسوم إضافية."""
+                } else {
+                    if (isEn) """⚠️ Quota Finished:
+Speed reduced to minimum survival speed (1 KB/s)."""
+                    else """⚠️ نفدت الباقة المحددة:
+تم خفض سرعة الإنترنت إلى أدنى حد (1 كيلوبايت/ثانية)."""
+                }
+            ))
+            .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(false)
             .setOngoing(true)
 
         if (action == "disconnect") {
-            // ✅ إصلاح: قطع الإنترنت فقط بدون إيقاف الخدمة
-            // الخدمة تبقى شغالة لكن يتم إسقاط كل الحزم داخل VpnWorker
             isDataCapBlocking = true
             vpnWorker?.setDataCapBlocking(true)
-            builder.setContentText("🚫 تم قطع الإنترنت — تجاوزت حد البيانات اليومي. افتح التطبيق لإعادة التفعيل.")
-            manager.notify(2027, builder.build())
-            // تحديث إشعار الخدمة
-            NetworkMonitorService.instance?.updateNotification()
         } else {
-            builder.setContentText("⚠️ تم تقييد سرعة الإنترنت لتجاوزك حد البيانات اليومي.")
-            manager.notify(2027, builder.build())
-            // تحديث إشعار الخدمة
-            NetworkMonitorService.instance?.updateNotification()
-            // تقييد السرعة لـ 1 KB/s
             vpnWorker?.setRates(1024L, 1024L)
         }
+
+        manager.notify(2027, builder.build())
+        NetworkMonitorService.instance?.updateNotification()
     }
 
-    // رفع الحظر الناتج عن الكوتا (يستدعيه Flutter عند إعادة التفعيل)
     fun resetDataCapBlock() {
         isDataCapBlocking = false
         vpnWorker?.setDataCapBlocking(false)
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.cancel(2027)
+        manager.cancel(2028 + 50)
+        manager.cancel(2028 + 75)
+        manager.cancel(2028 + 90)
         NetworkMonitorService.instance?.updateNotification()
     }
 

@@ -481,7 +481,6 @@ class _HistoryTabState extends State<HistoryTab> {
   }
 
   // =========================================================================
-  // DAY DETAIL MODAL (Matching User Screenshot 3)
   // =========================================================================
   void _showDayDetailDialog({
     required BuildContext context,

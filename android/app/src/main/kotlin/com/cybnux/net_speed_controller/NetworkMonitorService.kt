@@ -31,6 +31,7 @@ class NetworkMonitorService : Service() {
 
     companion object {
         const val CHANNEL_ID = "cybnux_monitor_channel"
+        const val ALERTS_CHANNEL_ID = "cybnux_alerts_channel"
         const val NOTIFICATION_ID = 3001
         const val SPIKE_NOTIFICATION_ID = 3002
 
@@ -88,9 +89,11 @@ class NetworkMonitorService : Service() {
     private var lastUsageQueryMs = 0L
 
     // كاشف النزيف السري للبيانات (Data Spike)
+    // فحص استهلاك البيانات المفاجئ والتسريب بالخلفية (Smart Leak & Spike Detector)
     private var spikeCheckStartTime = 0L
     private var spikeStartBytes = 0L
-    private var spikeAlertShownToday = false
+    private var lastSpikeAlertTimeMs = 0L
+    private val spikeAppSnapshots = HashMap<String, Long>()
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -212,12 +215,19 @@ class NetworkMonitorService : Service() {
             val dt = now - lastSpeedCheckMs
 
             if (dt >= 800L) {
-                if (curRx >= lastRxBytes && curTx >= lastTxBytes && lastRxBytes > 0) {
-                    liveDownBps = ((curRx - lastRxBytes) * 1000L) / dt
-                    liveUpBps = ((curTx - lastTxBytes) * 1000L) / dt
+                if (MyVpnService.isRunning) {
+                    // TrafficStats counts tun0 and physical interfaces together when VPN is active, causing 2x speed!
+                    // Use exact physical throughput from MyVpnService to avoid double counting.
+                    liveDownBps = MyVpnService.currentRxBps
+                    liveUpBps = MyVpnService.currentTxBps
                 } else {
-                    liveDownBps = 0
-                    liveUpBps = 0
+                    if (curRx >= lastRxBytes && curTx >= lastTxBytes && lastRxBytes > 0) {
+                        liveDownBps = ((curRx - lastRxBytes) * 1000L) / dt
+                        liveUpBps = ((curTx - lastTxBytes) * 1000L) / dt
+                    } else {
+                        liveDownBps = 0
+                        liveUpBps = 0
+                    }
                 }
                 lastRxBytes = curRx
                 lastTxBytes = curTx
@@ -285,30 +295,78 @@ class NetworkMonitorService : Service() {
     }
 
     // كاشف النزيف السري للبيانات (أكثر من 500 ميجابايت خلال 5 دقائق)
+        // فحص ذكي لاستهلاك البيانات المفاجئ وتسريب التطبيقات بالخلفية (بدون إنذارات كاذبة)
     private fun checkDataSpike(now: Long) {
         val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
         val spikeAlertEnabled = prefs.getBoolean("spike_alert_enabled", true)
         if (!spikeAlertEnabled) return
 
-        val totalCurrentBytes = TrafficStats.getTotalRxBytes() + TrafficStats.getTotalTxBytes()
+        if (spikeCheckStartTime == 0L) {
+            spikeCheckStartTime = now
+            val liveUsage = MyVpnService.instance?.getPerAppUsageMap()
+            if (liveUsage != null) {
+                spikeAppSnapshots.clear()
+                spikeAppSnapshots.putAll(liveUsage)
+            }
+            spikeStartBytes = if (MyVpnService.isRunning) {
+                MyVpnService.totalRxBytes + MyVpnService.totalTxBytes
+            } else {
+                TrafficStats.getTotalRxBytes() + TrafficStats.getTotalTxBytes()
+            }
+            return
+        }
+
         val durationMs = now - spikeCheckStartTime
-
-        if (durationMs > 300000L) { // كل 5 دقائق نفحص الزيادة
-            val diffBytes = totalCurrentBytes - spikeStartBytes
-            val diffMb = diffBytes / (1024.0 * 1024.0)
-
-            if (diffMb > 500.0 && !spikeAlertShownToday) {
-                showSpikeNotification(diffMb.toInt())
-                spikeAlertShownToday = true
+        if (durationMs >= 180000L) { // فحص كل 3 دقائق
+            val totalCurrentBytes = if (MyVpnService.isRunning) {
+                MyVpnService.totalRxBytes + MyVpnService.totalTxBytes
+            } else {
+                TrafficStats.getTotalRxBytes() + TrafficStats.getTotalTxBytes()
             }
 
-            // إعادة التصفير للدورة القادمة
+            val diffBytes = totalCurrentBytes - spikeStartBytes
+            val diffMb = if (diffBytes > 0) diffBytes / (1024.0 * 1024.0) else 0.0
+
+            val liveUsage = MyVpnService.instance?.getPerAppUsageMap()
+            var topAppPkg: String? = null
+            var topAppDeltaBytes = 0L
+
+            if (liveUsage != null) {
+                for ((pkg, currentBytes) in liveUsage) {
+                    if (pkg == packageName) continue
+                    val prevBytes = spikeAppSnapshots[pkg] ?: 0L
+                    val delta = currentBytes - prevBytes
+                    if (delta > topAppDeltaBytes) {
+                        topAppDeltaBytes = delta
+                        topAppPkg = pkg
+                    }
+                }
+                spikeAppSnapshots.clear()
+                spikeAppSnapshots.putAll(liveUsage)
+            }
+
+            val topAppMb = topAppDeltaBytes / (1024.0 * 1024.0)
+            val isCooldownOver = (now - lastSpikeAlertTimeMs > 3600000L) // مهلة ساعة بين التنبيهات لمنع التكرار
+
+            if (isCooldownOver) {
+                if (!isScreenOn && topAppMb >= 25.0 && topAppPkg != null) {
+                    // تسريب حقيقي مؤكد في الخلفية والشاشة مطفأة
+                    showRealSpikeNotification(topAppPkg, topAppMb.toInt(), isBackground = true)
+                    lastSpikeAlertTimeMs = now
+                } else if (isScreenOn && (topAppMb >= 200.0 || diffMb >= 350.0)) {
+                    // استهلاك مفاجئ مرتفع جداً أثناء استخدام الجهاز
+                    val alertMb = if (topAppMb >= 100.0) topAppMb.toInt() else diffMb.toInt()
+                    showRealSpikeNotification(topAppPkg, alertMb, isBackground = false)
+                    lastSpikeAlertTimeMs = now
+                }
+            }
+
             spikeCheckStartTime = now
             spikeStartBytes = totalCurrentBytes
         }
     }
 
-    private fun showSpikeNotification(consumedMb: Int) {
+    private fun showRealSpikeNotification(pkgName: String?, consumedMb: Int, isBackground: Boolean) {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
         val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
             putExtra("open_tab", "analytics")
@@ -321,16 +379,57 @@ class NetworkMonitorService : Service() {
         val prefs = getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
         val isEn = (prefs.getString("app_language", "ar") == "en")
 
-        val title = if (isEn) "⚠️ Alert: High Data Spike Detected!" else "⚠️ تنبيه: استهلاك مرتفع ومفاجئ للبيانات!"
-        val text = if (isEn) "Over $consumedMb MB consumed in the last few minutes." else "تم استهلاك حوالي $consumedMb ميجابايت خلال دقائق معدودة في الخلفية."
+        val appLabel = if (pkgName != null) {
+            try {
+                val ai = packageManager.getApplicationInfo(pkgName, 0)
+                packageManager.getApplicationLabel(ai).toString()
+            } catch (_: Exception) {
+                pkgName
+            }
+        } else null
 
-        val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+        val title: String
+        val text: String
+        val bigText: String
+
+        if (isBackground) {
+            title = if (isEn) "🚨 Background Data Leak Detected!" else "🚨 تنبيه تسريب بيانات بالخلفية!"
+            text = if (appLabel != null) {
+                if (isEn) "$appLabel consumed $consumedMb MB while screen was off."
+                else "استهلك تطبيق $appLabel أكثر من $consumedMb ميجابايت أثناء قفل الشاشة."
+            } else {
+                if (isEn) "High background data activity ($consumedMb MB) while locked."
+                else "نشاط بيانات مرتفع في الخلفية ($consumedMb ميجابايت) أثناء قفل الشاشة."
+            }
+            bigText = if (isEn) {
+                """🚨 Background Leak Alert:
+${appLabel ?: "An app"} consumed $consumedMb MB in the background. Tap to inspect and restrict."""
+            } else {
+                """🚨 إنذار تسريب بالخلفية:
+استهلك ${appLabel ?: "أحد التطبيقات"} $consumedMb ميجابايت أثناء قفل الشاشة. اضغط لتقييده وحماية الباقة."""
+            }
+        } else {
+            title = if (isEn) "⚠️ High Data Spike Detected!" else "⚠️ تنبيه: استهلاك مرتفع للبيانات!"
+            text = if (appLabel != null) {
+                if (isEn) "$appLabel consumed $consumedMb MB recently."
+                else "استهلك تطبيق $appLabel حوالي $consumedMb ميجابايت مؤخراً."
+            } else {
+                if (isEn) "Over $consumedMb MB consumed in the last few minutes."
+                else "تم استهلاك أكثر من $consumedMb ميجابايت خلال الدقائق الماضية."
+            }
+            bigText = if (isEn) {
+                """⚠️ High Data Consumption:
+${appLabel ?: "Data"} consumed $consumedMb MB in the last few minutes. Tap to manage limits."""
+            } else {
+                """⚠️ استهلاك بيانات مفاجئ:
+استهلك ${appLabel ?: "الجهاز"} $consumedMb ميجابايت في آخر الدقائق. اضغط لإدارة وتحديد السرعة."""
+            }
+        }
+
+        val notif = NotificationCompat.Builder(this, ALERTS_CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(
-                if (isEn) "⚠️ High Data Spike:\n$consumedMb MB used in the last 5 minutes. Tap to inspect background apps."
-                else "⚠️ تنبيه استهلاك مفاجئ:\nتم استهلاك $consumedMb MB خلال آخر 5 دقائق. افتح التطبيق للتحقق من التطبيق الذي يستهلك باقتك."
-            ))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

@@ -10,17 +10,22 @@ import org.json.JSONObject
 class PackageReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pkgName = intent.data?.schemeSpecificPart ?: return
+        val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
+        val savedLang = prefs.getString("app_language", prefs.getString("selected_language", null))
+        val isAr = if (savedLang != null) savedLang == "ar" else java.util.Locale.getDefault().language == "ar"
+
         if (intent.action == Intent.ACTION_PACKAGE_REMOVED) {
-            appendEvent(context, "WARN", "تم حذف التطبيق: $pkgName")
+            val msg = if (isAr) "تم إلغاء تثبيت تطبيق: $pkgName" else "App uninstalled: $pkgName"
+            appendEvent(context, "WARN", msg)
             Log.i("PackageReceiver", "App removed: $pkgName")
             return
         }
 
         if (intent.action == Intent.ACTION_PACKAGE_ADDED) {
-            appendEvent(context, "INFO", "تم تثبيت تطبيق: $pkgName")
+            val msg = if (isAr) "تم تثبيت تطبيق جديد: $pkgName" else "New app installed: $pkgName"
+            appendEvent(context, "INFO", msg)
             Log.i("PackageReceiver", "New app installed: $pkgName")
 
-            val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
             val autoQuarantine = prefs.getBoolean("cybnux_auto_quarantine", false)
             if (autoQuarantine) {
                 Log.i("PackageReceiver", "Auto-quarantining newly installed app: $pkgName")

@@ -298,6 +298,277 @@ class _FirewallTabState extends State<FirewallTab> {
     );
   }
 
+  void _showProfileSaveSnackBar(BuildContext context, String message, VpnManager vpn, AppStrings strings) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+        ),
+        backgroundColor: const Color(0xFF1E293B),
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.borderDark),
+        ),
+        action: SnackBarAction(
+          label: strings.isAr ? '💾 حفظ كملف' : '💾 Save Profile',
+          textColor: AppColors.accent,
+          onPressed: () async {
+            await vpn.saveCustomProfileSettings();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          strings.isAr
+                              ? 'تم حفظ التخصيص في ملفك المخصص بنجاح'
+                              : 'Saved to custom profile successfully',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: AppColors.accent,
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showCustomProfileBottomSheet(BuildContext context, VpnManager vpn, AppStrings strings) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.bgDark,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(color: AppColors.borderDark, width: 1),
+              left: BorderSide(color: AppColors.borderDark, width: 1),
+              right: BorderSide(color: AppColors.borderDark, width: 1),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Grab Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderDark,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Title Row
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.app_settings_alt_rounded, color: AppColors.accent, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          strings.isAr ? 'إدارة الملف المخصص' : 'Custom Profile Management',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${vpn.customizedAppsCount} ${strings.isAr ? "تطبيق مخصص بقواعد خاصة" : "apps with custom rules"}',
+                          style: TextStyle(fontSize: 12, color: AppColors.accent),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Description
+              Text(
+                strings.isAr
+                    ? 'يمكنك حفظ إعدادات وسرعات التطبيقات المخصصة الحالية كملف دائم، أو استعادة ملفك المحفوظ مسبقاً بضغطة واحدة.'
+                    : 'Save current custom app speeds & firewall rules as your permanent profile, or restore previously saved settings.',
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+
+              // Action 1: Save Profile
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await vpn.saveCustomProfileSettings();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                strings.isAr
+                                    ? 'تم حفظ التخصيص الحالي كملف مخصص بنجاح'
+                                    : 'Current setup saved to custom profile successfully',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: AppColors.accent,
+                        duration: const Duration(seconds: 3),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceCardDark,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.save_rounded, color: AppColors.accent, size: 20),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              strings.isAr ? 'حفظ التخصيص الحالي كملف دائم' : 'Save Current Setup Permanently',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              strings.isAr ? 'اعتماد قواعد وسرعات التطبيقات الحالية' : 'Persist current app limits permanently',
+                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textSecondary),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Action 2: Restore Profile
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await vpn.restoreAndApplyCustomProfile();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.replay_rounded, color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                strings.isAr
+                                    ? 'تم استعادة وتطبيق ملفك المخصص بنجاح'
+                                    : 'Custom profile restored and applied',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        duration: const Duration(seconds: 3),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceCardDark,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.restore_rounded, color: Color(0xFF8B5CF6), size: 20),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              strings.isAr ? 'استعادة الملف المحفوظ' : 'Restore Saved Profile',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              strings.isAr ? 'الرجوع للقواعد والسرعات المحفوظة سابقاً' : 'Revert to previously saved rules',
+                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textSecondary),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildFilterChip(String label, String key, VpnManager vpn, AppStrings strings) {
     final isSelected = _activeFilter == key;
     final displayLabel = (key == 'custom' && vpn.customizedAppsCount > 0)
@@ -306,10 +577,14 @@ class _FirewallTabState extends State<FirewallTab> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
-        setState(() => _activeFilter = key);
+        if (key == 'custom' && isSelected) {
+          _showCustomProfileBottomSheet(context, vpn, strings);
+        } else {
+          setState(() => _activeFilter = key);
+        }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accent : AppColors.surfaceCardDark,
           borderRadius: BorderRadius.circular(10),
@@ -317,13 +592,37 @@ class _FirewallTabState extends State<FirewallTab> {
             color: isSelected ? AppColors.accent : AppColors.borderDark,
           ),
         ),
-        child: Text(
-          displayLabel,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? Colors.white : AppColors.textSecondary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              displayLabel,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+            if (key == 'custom') ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _showCustomProfileBottomSheet(context, vpn, strings),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.white.withValues(alpha: 0.25) : AppColors.surfaceHover,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.more_vert_rounded,
+                    size: 14,
+                    color: isSelected ? Colors.white : AppColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -586,8 +885,12 @@ class _FirewallTabState extends State<FirewallTab> {
       badgeText = '∞';
       badgeColor = AppColors.accent;
     } else if (app.speedMode == 'custom') {
-      badgeText = app.customSpeedLimitKbps == 0 ? '0K' : '${app.customSpeedLimitKbps}K';
+      badgeText = app.customSpeedLimitKbps == 0 ? (strings.isAr ? 'كتم 0' : '0K') : '${app.customSpeedLimitKbps}K';
       badgeColor = const Color(0xFFF59E0B);
+    } else {
+      if (vpn.config.downloadSpeedLimit > 0) {
+        badgeText = '${vpn.config.downloadSpeedLimit}K';
+      }
     }
 
     return GestureDetector(
@@ -691,21 +994,56 @@ class _FirewallTabState extends State<FirewallTab> {
                   ),
                   const SizedBox(height: 18),
 
+                  // ── Clarification Banner ──
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline, color: AppColors.accent, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            strings.isAr
+                                ? 'الوضع العادي يتبع السرعة العامة للداشبورد. لتقييد سرعة هذا التطبيق بشكل منفصل، اختر «مخصص» وحدد السرعة ثم احفظ.'
+                                : 'Default mode follows the main dashboard limit. To restrict this app individually, choose "Custom", set the speed, and save.',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textPrimary, height: 1.35),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // ── Speed Mode: Default ──
                   _buildSpeedModeOption(
                     icon: Icons.settings_backup_restore,
                     iconColor: AppColors.textSecondary,
                     title: strings.presetDefault,
-                    subtitle: strings.isAr ? 'يتبع إعدادات السرعة الرئيسية' : 'Follows main speed limit',
+                    subtitle: vpn.config.downloadSpeedLimit > 0
+                        ? (strings.isAr
+                            ? 'يتبع السرعة العامة الرئيسية (${vpn.config.downloadSpeedLimit} KB/s)'
+                            : 'Follows master limit (${vpn.config.downloadSpeedLimit} KB/s)')
+                        : (strings.isAr
+                            ? 'يتبع السرعة العامة للداشبورد (غير مقيد حالياً - بدون سقف)'
+                            : 'Follows master limit (Currently unrestricted)'),
                     isSelected: selectedMode == 'default',
                     onTap: () {
                       vpn.setAppSpeedMode(app, 'default');
                       Navigator.pop(ctx);
+                      final isGloballyLimited = vpn.config.downloadSpeedLimit > 0;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
                             strings.isAr
-                                ? 'تم ضبط ${app.name} على الوضع العادي (يتبع السرعة الرئيسية)'
+                                ? (isGloballyLimited
+                                    ? 'تم ضبط ${app.name} على الوضع العادي (مقيد بالسرعة العامة: ${vpn.config.downloadSpeedLimit} KB/s)'
+                                    : 'تم ضبط ${app.name} على الوضع العادي (السرعة العامة غير مقيدة)')
                                 : '${app.name} set to Default speed mode',
                             style: const TextStyle(color: Colors.white),
                           ),
@@ -802,6 +1140,58 @@ class _FirewallTabState extends State<FirewallTab> {
                           ],
                         ),
                         const SizedBox(height: 12),
+                        // Quick Presets
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (final preset in [
+                                {'label': strings.isAr ? 'كتم 0' : '0 Mute', 'val': 0},
+                                {'label': '64K', 'val': 64},
+                                {'label': '128K', 'val': 128},
+                                {'label': '256K', 'val': 256},
+                                {'label': '512K', 'val': 512},
+                                {'label': '1024K', 'val': 1024},
+                              ])
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setSheetState(() {
+                                        customKbps = preset['val'] as int;
+                                        selectedMode = 'custom';
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: (selectedMode == 'custom' && customKbps == preset['val'])
+                                            ? const Color(0xFFF59E0B)
+                                            : AppColors.surfaceCardDark,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: (selectedMode == 'custom' && customKbps == preset['val'])
+                                              ? const Color(0xFFF59E0B)
+                                              : AppColors.borderDark,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        preset['label'] as String,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: (selectedMode == 'custom' && customKbps == preset['val'])
+                                              ? Colors.black
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
                         SliderTheme(
                           data: SliderTheme.of(ctx).copyWith(
                             activeTrackColor: customKbps == 0 ? AppColors.red : const Color(0xFFF59E0B),
@@ -845,18 +1235,13 @@ class _FirewallTabState extends State<FirewallTab> {
                               final speedText = customKbps == 0
                                   ? (strings.isAr ? 'كتم كامل 0 KB/s' : '0 KB/s (Muted)')
                                   : '\u200E$customKbps KB/s';
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    strings.isAr
-                                        ? 'تم ضبط وحفظ سرعة ${app.name} على $speedText'
-                                        : '${app.name} custom speed set to $speedText',
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                  backgroundColor: const Color(0xFFF59E0B),
-                                  duration: const Duration(seconds: 2),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
+                              _showProfileSaveSnackBar(
+                                context,
+                                strings.isAr
+                                    ? 'تم ضبط سرعة ${app.name} على $speedText'
+                                    : '${app.name} speed set to $speedText',
+                                vpn,
+                                strings,
                               );
                             },
                             style: ElevatedButton.styleFrom(

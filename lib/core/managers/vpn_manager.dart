@@ -177,6 +177,13 @@ class VpnManager extends ChangeNotifier {
       await MethodChannelService.setAppLanguage(savedLang);
     } catch (_) {}
 
+    try {
+      final savedLogs = await StorageService.loadTerminalLogs();
+      if (savedLogs.isNotEmpty) {
+        _terminalLogs.addAll(savedLogs);
+      }
+    } catch (_) {}
+
     final savedConfig = await StorageService.loadConfig();
     if (savedConfig != null) {
       config = savedConfig;
@@ -891,6 +898,9 @@ class VpnManager extends ChangeNotifier {
         app.isWifiAllowed = allow;
         app.isMobileAllowed = allow;
         app.tempAllowUntil = null;
+        if (allow && app.speedMode == 'custom' && app.customSpeedLimitKbps == 0) {
+          app.speedMode = 'default';
+        }
         count++;
       }
     }
@@ -954,6 +964,9 @@ class VpnManager extends ChangeNotifier {
     app.tempAllowUntil = DateTime.now().add(duration);
     app.isWifiAllowed = true;
     app.isMobileAllowed = true;
+    if (app.speedMode == 'custom' && app.customSpeedLimitKbps == 0) {
+      app.speedMode = 'default';
+    }
     addLog(
         "OK",
         isArabic
@@ -980,6 +993,9 @@ class VpnManager extends ChangeNotifier {
 
   void toggleAppWifi(AppInfo app) {
     app.isWifiAllowed = !app.isWifiAllowed;
+    if (app.isWifiAllowed && app.speedMode == 'custom' && app.customSpeedLimitKbps == 0) {
+      app.speedMode = 'default';
+    }
     activeSecurityProfile = 'custom';
     _persistState();
     syncNativeSettings();
@@ -988,6 +1004,9 @@ class VpnManager extends ChangeNotifier {
 
   void toggleAppMobile(AppInfo app) {
     app.isMobileAllowed = !app.isMobileAllowed;
+    if (app.isMobileAllowed && app.speedMode == 'custom' && app.customSpeedLimitKbps == 0) {
+      app.speedMode = 'default';
+    }
     activeSecurityProfile = 'custom';
     _persistState();
     syncNativeSettings();
