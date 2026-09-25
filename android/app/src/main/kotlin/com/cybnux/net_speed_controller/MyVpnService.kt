@@ -164,8 +164,8 @@ class MyVpnService : VpnService() {
         fun buildStartIntentFromPrefs(context: Context): Intent? {
             return try {
                 val prefs = context.getSharedPreferences("cybnux_settings", Context.MODE_PRIVATE)
-                val downloadLimit = prefs.getLong("download_limit", 0L)
-                val uploadLimit = prefs.getLong("upload_limit", 0L)
+                val downloadLimit = prefs.getLong("download_limit", -1L)
+                val uploadLimit = prefs.getLong("upload_limit", -1L)
                 val allowedApps = ArrayList(prefs.getStringSet("allowed_apps", emptySet()) ?: emptySet())
                 val blockedWifiApps = ArrayList(prefs.getStringSet("blocked_wifi_apps", emptySet()) ?: emptySet())
                 val blockedDataApps = ArrayList(prefs.getStringSet("blocked_data_apps", emptySet()) ?: emptySet())
@@ -520,7 +520,7 @@ class MyVpnService : VpnService() {
             builder.setMtu(1500)
             builder.setSession("NetSpeedController")
 
-            builder.allowBypass()
+            builder.setBlocking(true)
 
             // Always exclude own package and system networkstack / tethering so hotspot and p2p never stall or loop
             val excludedPkgs = listOf(

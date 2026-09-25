@@ -216,10 +216,22 @@ class NetworkMonitorService : Service() {
 
             if (dt >= 800L) {
                 if (MyVpnService.isRunning) {
-                    // TrafficStats counts tun0 and physical interfaces together when VPN is active, causing 2x speed!
-                    // Use exact physical throughput from MyVpnService to avoid double counting.
-                    liveDownBps = MyVpnService.currentRxBps
-                    liveUpBps = MyVpnService.currentTxBps
+                    val vpnRx = MyVpnService.currentRxBps
+                    val vpnTx = MyVpnService.currentTxBps
+                    if (vpnRx > 0L || vpnTx > 0L) {
+                        liveDownBps = vpnRx
+                        liveUpBps = vpnTx
+                    } else {
+                        // Fallback: If VpnService currently reports 0 (e.g. startup second or physical traffic),
+                        // use physical delta from TrafficStats so the meter NEVER blinds the user!
+                        if (curRx >= lastRxBytes && curTx >= lastTxBytes && lastRxBytes > 0) {
+                            liveDownBps = ((curRx - lastRxBytes) * 1000L) / dt
+                            liveUpBps = ((curTx - lastTxBytes) * 1000L) / dt
+                        } else {
+                            liveDownBps = 0L
+                            liveUpBps = 0L
+                        }
+                    }
                 } else {
                     if (curRx >= lastRxBytes && curTx >= lastTxBytes && lastRxBytes > 0) {
                         liveDownBps = ((curRx - lastRxBytes) * 1000L) / dt

@@ -162,8 +162,8 @@ class MainActivity: FlutterActivity() {
         channel.setMethodCallHandler { call: MethodCall, result: MethodChannel.Result ->
             when (call.method) {
                 "startVpn" -> {
-                    val download = call.argument<Number>("downloadLimit")?.toLong() ?: 0L
-                    val upload = call.argument<Number>("uploadLimit")?.toLong() ?: 0L
+                    val download = call.argument<Number>("downloadLimit")?.toLong() ?: -1L
+                    val upload = call.argument<Number>("uploadLimit")?.toLong() ?: -1L
                     val allowedApps = call.argument<List<String>>("allowedApps") ?: emptyList()
                     val blockedWifiApps = call.argument<List<String>>("blockedWifiApps") ?: emptyList()
                     val blockedDataApps = call.argument<List<String>>("blockedDataApps") ?: emptyList()
@@ -233,8 +233,8 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
                 "updateSettings" -> {
-                    val download = call.argument<Number>("downloadLimit")?.toLong() ?: 0L
-                    val upload = call.argument<Number>("uploadLimit")?.toLong() ?: 0L
+                    val download = call.argument<Number>("downloadLimit")?.toLong() ?: -1L
+                    val upload = call.argument<Number>("uploadLimit")?.toLong() ?: -1L
                     val allowedApps = call.argument<List<String>>("allowedApps") ?: emptyList()
                     val blockedWifiApps = call.argument<List<String>>("blockedWifiApps") ?: emptyList()
                     val blockedDataApps = call.argument<List<String>>("blockedDataApps") ?: emptyList()
