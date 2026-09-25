@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/managers/vpn_manager.dart';
@@ -19,15 +20,27 @@ class _HistoryTabState extends State<HistoryTab> {
   Map<String, dynamic>? _statsMonth;
   Map<String, dynamic>? _statsThisMonth;
   bool _isLoading = false;
+  Timer? _liveRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadAllStats();
+    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) _loadAllStats(silent: true);
+    });
   }
 
-  Future<void> _loadAllStats() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _liveRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadAllStats({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoading = true);
+    }
     try {
       final week = await MethodChannelService.getRealPeriodData('week');
       final month = await MethodChannelService.getRealPeriodData('month');
@@ -41,7 +54,7 @@ class _HistoryTabState extends State<HistoryTab> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && !silent) setState(() => _isLoading = false);
     }
   }
 
@@ -101,9 +114,11 @@ class _HistoryTabState extends State<HistoryTab> {
       }
     }
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      children: [
+    return RefreshIndicator(
+      onRefresh: () => _loadAllStats(),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        children: [
         // ==========================================
         // 1. TOP SUMMARY CARDS (7 Days, 30 Days, This Month)
         // ==========================================
@@ -402,6 +417,7 @@ class _HistoryTabState extends State<HistoryTab> {
           }),
         const SizedBox(height: 16),
       ],
+      ),
     );
   }
 

@@ -584,6 +584,12 @@ class _UsageTabState extends State<UsageTab> {
             packageName: pkg,
             isSystem: false,
           ));
+        } else if (pkg == 'com.cybnux.android_system') {
+          allApps.add(AppInfo(
+            name: vpn.isArabic ? 'نظام أندرويد وخدمات النظام' : 'Android OS & System Services',
+            packageName: pkg,
+            isSystem: true,
+          ));
         } else {
           allApps.add(AppInfo(
             name: pkg,
@@ -818,7 +824,9 @@ class _UsageTabState extends State<UsageTab> {
                                         ? const Color(0xFFF59E0B).withValues(alpha: 0.18)
                                         : app.packageName == 'com.cybnux.uninstalled_apps'
                                             ? const Color(0xFFEF4444).withValues(alpha: 0.18)
-                                            : AppColors.surfaceHover,
+                                            : app.packageName == 'com.cybnux.android_system'
+                                                ? const Color(0xFF10B981).withValues(alpha: 0.18)
+                                                : AppColors.surfaceHover,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: ClipRRect(
@@ -827,7 +835,9 @@ class _UsageTabState extends State<UsageTab> {
                                         ? const Icon(Icons.wifi_tethering_rounded, color: Color(0xFFF59E0B), size: 20)
                                         : app.packageName == 'com.cybnux.uninstalled_apps'
                                             ? const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)
-                                            : app.iconBytes != null
+                                            : app.packageName == 'com.cybnux.android_system'
+                                                ? const Icon(Icons.android_rounded, color: Color(0xFF10B981), size: 20)
+                                                : app.iconBytes != null
                                                 ? Image.memory(
                                                     app.iconBytes!,
                                                     width: 36,
@@ -848,7 +858,9 @@ class _UsageTabState extends State<UsageTab> {
                                         app.packageName == 'com.cybnux.tethering_hotspot'
                                             ? (vpn.isArabic ? 'نقطة اتصال الهواتف (بث)' : 'Tethering & Hotspot')
                                             : app.packageName == 'com.cybnux.uninstalled_apps'
-                                                ? (vpn.isArabic ? 'تطبيقات محذوفة' : 'Uninstalled Applications')
+                                            ? (vpn.isArabic ? 'تطبيقات محذوفة' : 'Uninstalled Applications')
+                                            : app.packageName == 'com.cybnux.android_system'
+                                                ? (vpn.isArabic ? 'نظام أندرويد وخدمات النظام' : 'Android OS & System Services')
                                                 : app.name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -859,7 +871,9 @@ class _UsageTabState extends State<UsageTab> {
                                               ? const Color(0xFFF59E0B)
                                               : app.packageName == 'com.cybnux.uninstalled_apps'
                                                   ? const Color(0xFFEF4444)
-                                                  : AppColors.textPrimary,
+                                                  : app.packageName == 'com.cybnux.android_system'
+                                                      ? const Color(0xFF10B981)
+                                                      : AppColors.textPrimary,
                                         ),
                                       ),
                                       if (_networkFilter == 'all') ...[

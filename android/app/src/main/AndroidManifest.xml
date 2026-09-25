@@ -101,7 +101,7 @@
         <!-- Android Quick Settings Tile Service (Pull-down curtain toggle) -->
         <service
             android:name=".NetGuardTileService"
-            android:icon="@drawable/ic_notification"
+            android:icon="@mipmap/ic_launcher"
             android:label="Net Guard"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">

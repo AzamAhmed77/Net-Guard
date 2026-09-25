@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/managers/vpn_manager.dart';
@@ -20,11 +21,21 @@ class _DashboardTabState extends State<DashboardTab> {
   double _totalWifiMb = 0.0;
   double _totalMobileMb = 0.0;
   bool _hasLoadedTraffic = false;
+  Timer? _liveTrafficTimer;
 
   @override
   void initState() {
     super.initState();
     _loadTodayTraffic();
+    _liveTrafficTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) _loadTodayTraffic();
+    });
+  }
+
+  @override
+  void dispose() {
+    _liveTrafficTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadTodayTraffic() async {
@@ -84,6 +95,12 @@ class _DashboardTabState extends State<DashboardTab> {
             name: vpn.isArabic ? 'تطبيقات محذوفة' : 'Uninstalled Applications',
             packageName: pkg,
             isSystem: false,
+          ));
+        } else if (pkg == 'com.cybnux.android_system') {
+          allApps.add(AppInfo(
+            name: vpn.isArabic ? 'نظام أندرويد وخدمات النظام' : 'Android OS & System Services',
+            packageName: pkg,
+            isSystem: true,
           ));
         } else {
           allApps.add(AppInfo(

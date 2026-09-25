@@ -275,6 +275,14 @@ class VpnWorker(private val vpnService: VpnService) {
         }
         refillTokens()
         resumePausedTcpReaders()
+        if (dl > 0 || ul > 0) {
+            // Close any active QUIC UDP sockets to force immediate fallback to TCP
+            for ((key, e) in udpTable.entries.toList()) {
+                if (e.dstPort == 443 || e.dstPort == 80) {
+                    removeUdp(key, e)
+                }
+            }
+        }
         selector?.wakeup()
         synchronized(queueLock) {
             queueLock.notifyAll()
@@ -517,6 +525,13 @@ class VpnWorker(private val vpnService: VpnService) {
                     try { entry.ch.close() } catch (_: Exception) {}
                     try { entry.key?.cancel() } catch (_: Exception) {}
                     udpTable.remove(key)
+                }
+            }
+            // Terminate active QUIC sockets for custom speed throttled apps
+            for ((key, entry) in udpTable.entries.toList()) {
+                val pkg = entry.packageName
+                if ((entry.dstPort == 443 || entry.dstPort == 80) && pkg != null && modes[pkg] == "custom" && ((dlLimits[pkg] ?: -1L) > 0L)) {
+                    removeUdp(key, entry)
                 }
             }
             socketUidCache.clear()
@@ -1021,6 +1036,16 @@ class VpnWorker(private val vpnService: VpnService) {
                 return
             }
 
+            // QUIC Mitigation: If download/upload speed limiting is active, block UDP 443/80
+            // This forces apps (Twitter/X, YouTube, Chrome, Instagram) to fall back to TCP
+            // where TCP sliding window backpressure strictly enforces the limit without packet bursts
+            val shouldThrottle = shouldThrottleApp(pkg)
+            val isSpeedLimitingActive = downloadBps > 0 || uploadBps > 0 ||
+                    (pkg != null && ((appDlLimits[pkg] ?: -1L) > 0L || (appUlLimits[pkg] ?: -1L) > 0L))
+            if ((dP == 443 || dP == 80) && isSpeedLimitingActive && shouldThrottle) {
+                return
+            }
+
             try {
                 val ch = DatagramChannel.open().apply {
                     configureBlocking(false)
@@ -1066,6 +1091,12 @@ class VpnWorker(private val vpnService: VpnService) {
             return
         }
         val shouldThrottle = shouldThrottleApp(pkg)
+        val isSpeedLimitingActive = downloadBps > 0 || uploadBps > 0 ||
+                (pkg != null && ((appDlLimits[pkg] ?: -1L) > 0L || (appUlLimits[pkg] ?: -1L) > 0L))
+        if ((dP == 443 || dP == 80) && isSpeedLimitingActive && shouldThrottle) {
+            removeUdp(key, e)
+            return
+        }
         if (shouldThrottle) {
             val appLimiter = if (pkg != null) getAppUlLimiter(pkg) else null
             if (appLimiter != null) {
@@ -1111,10 +1142,49 @@ class VpnWorker(private val vpnService: VpnService) {
             removeUdp(key, e)
             return
         }
+        val shouldThrottle = shouldThrottleApp(udpInPkg)
+        val isSpeedLimitingActive = downloadBps > 0 || uploadBps > 0 ||
+                (udpInPkg != null && ((appDlLimits[udpInPkg] ?: -1L) > 0L || (appUlLimits[udpInPkg] ?: -1L) > 0L))
+
+        // If ingress QUIC arrives while rate limiting is active, discard and close connection
+        if ((e.dstPort == 443 || e.dstPort == 80) && isSpeedLimitingActive && shouldThrottle) {
+            val buf = ByteBuffer.allocate(MTU)
+            try { e.ch.read(buf) } catch (_: Exception) {}
+            val key = "${e.srcAddr.hex()}:${e.srcPort}>${e.dstAddr.hex()}:${e.dstPort}"
+            removeUdp(key, e)
+            return
+        }
+
+        // Drop incoming UDP packets if device queue is saturated (except DNS queries)
+        if (toDeviceQueue.size > 200 && e.dstPort != 53) {
+            val buf = ByteBuffer.allocate(MTU)
+            try { e.ch.read(buf) } catch (_: Exception) {}
+            return
+        }
+
         val buf = ByteBuffer.allocate(MTU)
         try {
             val n = e.ch.read(buf); if (n <= 0) return
             buf.flip(); val data = ByteArray(n); buf.get(data)
+
+            // Strict ingress token check for UDP rate limiting (DNS port 53 is exempt to avoid lookup delays)
+            if (shouldThrottle && e.dstPort != 53) {
+                val appLimiter = if (udpInPkg != null) getAppDlLimiter(udpInPkg) else null
+                if (appLimiter != null) {
+                    if (appLimiter.limitBps == 0L || !appLimiter.consume(n.toLong())) {
+                        return // Dropped to enforce per-app rate limit
+                    }
+                } else if (downloadBps >= 0) {
+                    if (downloadBps == 0L) return // 0 KB/s: drop
+                    synchronized(this) {
+                        refillTokens()
+                        if (dlTokens < n) {
+                            return // Dropped to enforce global download rate limit
+                        }
+                        dlTokens -= n
+                    }
+                }
+            }
             
             MyVpnService.totalRxBytes += n
             rxBytesThisSecond += n

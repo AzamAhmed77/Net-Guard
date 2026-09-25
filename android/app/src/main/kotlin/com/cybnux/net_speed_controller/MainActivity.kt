@@ -722,6 +722,21 @@ class MainActivity: FlutterActivity() {
                                     cellStats.close()
                                 } catch (_: Exception) {}
 
+                                if (period == "today") {
+                                    val monWifi = NetworkMonitorService.todayWifiBytes
+                                    val monCell = NetworkMonitorService.todayMobileBytes
+                                    if (monWifi > (wifiTotalRx + wifiTotalTx)) {
+                                        val diff = monWifi - (wifiTotalRx + wifiTotalTx)
+                                        wifiTotalRx += diff
+                                    }
+                                    if (monCell > (cellTotalRx + cellTotalTx)) {
+                                        val diff = monCell - (cellTotalRx + cellTotalTx)
+                                        cellTotalRx += diff
+                                    }
+                                    totalRx = wifiTotalRx + cellTotalRx
+                                    totalTx = wifiTotalTx + cellTotalTx
+                                }
+
                                 try {
                                     val wifiDetails = nsm.queryDetails(NetworkCapabilities.TRANSPORT_WIFI, null, periodStartTime, now)
                                     while (wifiDetails.hasNextBucket()) {
@@ -796,6 +811,7 @@ class MainActivity: FlutterActivity() {
                             dayCal.set(java.util.Calendar.HOUR_OF_DAY, 0)
                             dayCal.set(java.util.Calendar.MINUTE, 0)
                             dayCal.set(java.util.Calendar.SECOND, 0)
+                            dayCal.set(java.util.Calendar.MILLISECOND, 0)
 
                             val dayNames = arrayOf("الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")
                             val numDays = when (period) {
@@ -839,6 +855,19 @@ class MainActivity: FlutterActivity() {
                                         }
                                         c.close()
                                     } catch (_: Exception) {}
+                                }
+
+                                if (i == 0) {
+                                    val monWifi = NetworkMonitorService.todayWifiBytes
+                                    val monCell = NetworkMonitorService.todayMobileBytes
+                                    if (monWifi > (dayWifiRx + dayWifiTx)) {
+                                        val diff = monWifi - (dayWifiRx + dayWifiTx)
+                                        dayWifiRx += diff
+                                    }
+                                    if (monCell > (dayMobileRx + dayMobileTx)) {
+                                        val diff = monCell - (dayMobileRx + dayMobileTx)
+                                        dayMobileRx += diff
+                                    }
                                 }
 
                                 val dayRx = dayWifiRx + dayMobileRx
@@ -1158,19 +1187,64 @@ class MainActivity: FlutterActivity() {
                                             }
                                         }
                                     }
+                                    // Ensure totalWifiBytes and totalMobileBytes represent true hardware interface stats
+                                    try {
+                                        var summaryWifi = 0L
+                                        val wSum = nsm.querySummary(NetworkCapabilities.TRANSPORT_WIFI, null, periodStart, periodEnd)
+                                        while (wSum.hasNextBucket()) {
+                                            wSum.getNextBucket(bucket)
+                                            summaryWifi += (bucket.rxBytes + bucket.txBytes)
+                                        }
+                                        wSum.close()
+                                        if (summaryWifi > totalWifiBytes) totalWifiBytes = summaryWifi
+                                    } catch (_: Exception) {}
+
+                                    try {
+                                        var summaryCell = 0L
+                                        val cSum = nsm.querySummary(NetworkCapabilities.TRANSPORT_CELLULAR, null, periodStart, periodEnd)
+                                        while (cSum.hasNextBucket()) {
+                                            cSum.getNextBucket(bucket)
+                                            summaryCell += (bucket.rxBytes + bucket.txBytes)
+                                        }
+                                        cSum.close()
+                                        if (summaryCell > totalMobileBytes) totalMobileBytes = summaryCell
+                                    } catch (_: Exception) {}
                                 }
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error in getPerAppTrafficByNetwork: ${e.message}")
                         }
 
-                        val res = HashMap<String, Any>()
+                        // For today, synchronize with NetworkMonitorService live stats if higher
+                        if (session == "today") {
+                            val monWifi = NetworkMonitorService.todayWifiBytes
+                            val monCell = NetworkMonitorService.todayMobileBytes
+                            if (monWifi > totalWifiBytes) totalWifiBytes = monWifi
+                            if (monCell > totalMobileBytes) totalMobileBytes = monCell
+                        }
+
                         wifiMap.remove(packageName)
                         mobileMap.remove(packageName)
+
+                        val totalWifiMb = totalWifiBytes.toDouble() / (1024.0 * 1024.0)
+                        val totalMobileMb = totalMobileBytes.toDouble() / (1024.0 * 1024.0)
+
+                        // Calculate OS & system services traffic (root, kernel, system daemons UID < 1000)
+                        val appsWifiMb = wifiMap.values.sum()
+                        val appsMobileMb = mobileMap.values.sum()
+                        val systemWifiMb = maxOf(0.0, totalWifiMb - appsWifiMb)
+                        val systemMobileMb = maxOf(0.0, totalMobileMb - appsMobileMb)
+
+                        if ((systemWifiMb + systemMobileMb) > 0.05) {
+                            wifiMap["com.cybnux.android_system"] = systemWifiMb
+                            mobileMap["com.cybnux.android_system"] = systemMobileMb
+                        }
+
+                        val res = HashMap<String, Any>()
                         res["wifi"] = wifiMap
                         res["mobile"] = mobileMap
-                        res["totalWifiMb"] = totalWifiBytes.toDouble() / (1024.0 * 1024.0)
-                        res["totalMobileMb"] = totalMobileBytes.toDouble() / (1024.0 * 1024.0)
+                        res["totalWifiMb"] = totalWifiMb
+                        res["totalMobileMb"] = totalMobileMb
                         res["startTime"] = periodStart
                         res["endTime"] = periodEnd
                         runOnUiThread {
