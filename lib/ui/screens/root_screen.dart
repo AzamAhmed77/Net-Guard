@@ -123,8 +123,14 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
           ],
         ),
         actions: [
-          // Connection Status Pill
-          Container(
+          // Connection Status Pill (Tappable to toggle VPN)
+          GestureDetector(
+            onTap: () {
+              if (!manager.isVpnTransitioning) {
+                manager.toggleVpn();
+              }
+            },
+            child: Container(
             margin: const EdgeInsets.symmetric(vertical: 13),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
@@ -165,6 +171,7 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ],
+            ),
             ),
           ),
           const SizedBox(width: 6),
