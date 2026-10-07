@@ -1480,7 +1480,7 @@ class VpnManager extends ChangeNotifier {
   double _lastNotifiedUp = -1.0;
 
   void _startRealTrafficTicker() {
-    _statsTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+    _statsTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (_statsRequestInFlight) return;
       _statsRequestInFlight = true;
       try {

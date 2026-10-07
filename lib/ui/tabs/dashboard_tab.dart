@@ -7,6 +7,7 @@ import '../../core/themes/app_colors.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/services/method_channel_service.dart';
 import '../widgets/usage_donut_chart.dart';
+import '../widgets/sparkline_chart.dart';
 
 class DashboardTab extends StatefulWidget {
   const DashboardTab({super.key});
@@ -225,7 +226,13 @@ class _DashboardTabState extends State<DashboardTab> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
+              SparklineChartWidget(
+                data: vpn.downloadHistory,
+                color: AppColors.accent,
+                height: 38,
+              ),
+              const SizedBox(height: 12),
               const Divider(color: AppColors.borderDark, height: 1),
               const SizedBox(height: 14),
               Row(

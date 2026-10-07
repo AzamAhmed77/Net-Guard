@@ -642,10 +642,17 @@ class MainActivity: FlutterActivity() {
                 }
                 "getStats" -> {
                     val statsMap = HashMap<String, Any>()
-                    statsMap["downloadBps"] = downloadBps
-                    statsMap["uploadBps"] = uploadBps
-                    statsMap["totalDownloadBytes"] = totalDownloadBytes
-                    statsMap["totalUploadBytes"] = totalUploadBytes
+                    if (MyVpnService.isRunning) {
+                        statsMap["downloadBps"] = MyVpnService.currentRxBps
+                        statsMap["uploadBps"] = MyVpnService.currentTxBps
+                        statsMap["totalDownloadBytes"] = MyVpnService.totalRxBytes
+                        statsMap["totalUploadBytes"] = MyVpnService.totalTxBytes
+                    } else {
+                        statsMap["downloadBps"] = downloadBps
+                        statsMap["uploadBps"] = uploadBps
+                        statsMap["totalDownloadBytes"] = totalDownloadBytes
+                        statsMap["totalUploadBytes"] = totalUploadBytes
+                    }
                     result.success(statsMap)
                 }
                 "getRealPeriodData" -> {

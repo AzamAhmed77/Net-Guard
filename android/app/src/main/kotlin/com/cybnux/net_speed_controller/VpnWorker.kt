@@ -116,8 +116,8 @@ class VpnWorker(private val vpnService: VpnService) {
     private var thNet: Thread? = null
 
     // ── Traffic stats variables ──
-    private var rxBytesThisSecond: Long = 0
-    private var txBytesThisSecond: Long = 0
+    @Volatile private var deliveredRxBytesThisSecond: Long = 0
+    @Volatile private var sentTxBytesThisSecond: Long = 0
     private var lastStatsMs: Long = System.currentTimeMillis()
     private var lastCleanupMs: Long = System.currentTimeMillis()
 
@@ -216,8 +216,8 @@ class VpnWorker(private val vpnService: VpnService) {
         selector = Selector.open()
 
         lastStatsMs = System.currentTimeMillis()
-        rxBytesThisSecond = 0
-        txBytesThisSecond = 0
+        deliveredRxBytesThisSecond = 0
+        sentTxBytesThisSecond = 0
         nextDlSendTimeMs = 0L
 
         thReader  = Thread({ loopTunReader() },  "VPN-TunRead").also  { it.start() }
@@ -552,13 +552,14 @@ class VpnWorker(private val vpnService: VpnService) {
         val now = System.currentTimeMillis()
         val capUL = uploadBps
         if (capUL > 0) {
+            val maxBurst = minOf(capUL / 4, 32768L).coerceAtLeast(4096L)
             if (ulRefill == 0L) {
                 ulRefill = now
-                ulTokens = minOf(capUL, 16384L)
+                ulTokens = maxBurst
             } else {
                 val dt = now - ulRefill
                 if (dt > 0) {
-                    ulTokens = minOf(capUL, ulTokens + (dt * capUL) / 1000L)
+                    ulTokens = minOf(maxBurst, ulTokens + (dt * capUL) / 1000L)
                     ulRefill = now
                 }
             }
@@ -569,13 +570,14 @@ class VpnWorker(private val vpnService: VpnService) {
 
         val capDL = downloadBps
         if (capDL > 0) {
+            val maxBurst = minOf(capDL / 4, 32768L).coerceAtLeast(4096L)
             if (dlRefill == 0L) {
                 dlRefill = now
-                dlTokens = minOf(capDL, 16384L)
+                dlTokens = maxBurst
             } else {
                 val dt = now - dlRefill
                 if (dt > 0) {
-                    dlTokens = minOf(capDL, dlTokens + (dt * capDL) / 1000L)
+                    dlTokens = minOf(maxBurst, dlTokens + (dt * capDL) / 1000L)
                     dlRefill = now
                 }
             }
@@ -815,9 +817,13 @@ class VpnWorker(private val vpnService: VpnService) {
                         continue
                     }
                     tunOut?.write(pkt!!.data)
+                    val pktLen = pkt!!.data.size.toLong()
+                    deliveredRxBytesThisSecond += pktLen
+                    MyVpnService.totalRxBytes += pktLen
                     
-                    if (ebpfEnabled) {
-                        // eBPF batch flush: drain any further ready packets in queue without context-switching flush on every packet
+                    val isRateLimited = downloadBps > 0 || appDlLimits.isNotEmpty()
+                    if (ebpfEnabled && !isRateLimited) {
+                        // eBPF batch flush: only drain additional packets when unthrottled
                         var batchCount = 1
                         while (batchCount < 16) {
                             val nextPkt = toDeviceQueue.peek() ?: break
@@ -825,15 +831,16 @@ class VpnWorker(private val vpnService: VpnService) {
                             if (nextPkt.sendTimeMs <= now) {
                                 val readyPkt = toDeviceQueue.poll() ?: break
                                 tunOut?.write(readyPkt.data)
+                                val rLen = readyPkt.data.size.toLong()
+                                deliveredRxBytesThisSecond += rLen
+                                MyVpnService.totalRxBytes += rLen
                                 batchCount++
                             } else {
                                 break
                             }
                         }
-                        tunOut?.flush()
-                    } else {
-                        tunOut?.flush()
                     }
+                    tunOut?.flush()
                 }
             } catch (e: InterruptedException) {
                 break
@@ -861,12 +868,8 @@ class VpnWorker(private val vpnService: VpnService) {
                 }
                 val selectTimeout = if (hasPausedTcp) {
                     25L
-                } else if (tcpTable.isEmpty() && udpTable.isEmpty()) {
-                    2000L
-                } else if (rxBytesThisSecond == 0L && txBytesThisSecond == 0L) {
-                    1000L
                 } else {
-                    50L
+                    500L
                 }
                 sel.select(selectTimeout)
 
@@ -904,14 +907,14 @@ class VpnWorker(private val vpnService: VpnService) {
                 // Update statistics
                 val dt = now - lastStatsMs
                 if (dt >= 1000L) {
-                    val newRx = rxBytesThisSecond * 1000 / dt
-                    val newTx = txBytesThisSecond * 1000 / dt
+                    val newRx = deliveredRxBytesThisSecond * 1000L / dt
+                    val newTx = sentTxBytesThisSecond * 1000L / dt
                     val changed = newRx != MyVpnService.currentRxBps || newTx != MyVpnService.currentTxBps
                     MyVpnService.currentRxBps = newRx
                     MyVpnService.currentTxBps = newTx
-                    updateDailyLog(rxBytesThisSecond, txBytesThisSecond)
-                    rxBytesThisSecond = 0
-                    txBytesThisSecond = 0
+                    updateDailyLog(deliveredRxBytesThisSecond, sentTxBytesThisSecond)
+                    deliveredRxBytesThisSecond = 0L
+                    sentTxBytesThisSecond = 0L
                     lastStatsMs = now
 
                     if (changed || newRx > 0 || newTx > 0) {
@@ -1137,13 +1140,15 @@ class VpnWorker(private val vpnService: VpnService) {
             }
         }
         
-        MyVpnService.totalTxBytes += payLen
-        txBytesThisSecond += payLen
-        checkDataCap(payLen)
-        if (pkg != null) addAppUsage(pkg, payLen.toLong())
+        val writtenUdp = try { e.ch.write(ByteBuffer.wrap(pkt, off, payLen)) }
+        catch (ex: Exception) { Log.w(TAG, "UDP send err: ${ex.message}"); removeUdp(key, e); 0 }
 
-        try { e.ch.write(ByteBuffer.wrap(pkt, off, payLen)) }
-        catch (ex: Exception) { Log.w(TAG, "UDP send err: ${ex.message}"); removeUdp(key, e) }
+        if (writtenUdp > 0) {
+            sentTxBytesThisSecond += writtenUdp.toLong()
+            MyVpnService.totalTxBytes += writtenUdp.toLong()
+            checkDataCap(writtenUdp)
+            if (pkg != null) addAppUsage(pkg, writtenUdp.toLong())
+        }
     }
 
     private fun onInUdp(e: UdpEntry) {
@@ -1203,8 +1208,6 @@ class VpnWorker(private val vpnService: VpnService) {
                 }
             }
             
-            MyVpnService.totalRxBytes += n
-            rxBytesThisSecond += n
             checkDataCap(n)
             if (udpInPkg != null) addAppUsage(udpInPkg, n.toLong())
 
@@ -1326,6 +1329,7 @@ class VpnWorker(private val vpnService: VpnService) {
         if (fl and ACK != 0 && e.state == TState.SYN_RECV) {
             e.state = TState.ESTABLISHED
         }
+        val shouldThrottle = shouldThrottleApp(pkg)
 
         val payOff = ihl + doff; val payLen = pkt.size - payOff
         if (payLen > 0 && e.state == TState.ESTABLISHED) {
@@ -1350,16 +1354,14 @@ class VpnWorker(private val vpnService: VpnService) {
             }
 
             e.myAck = seq + payLen
-            
-            MyVpnService.totalTxBytes += payLen
-            txBytesThisSecond += payLen
-            checkDataCap(payLen)
 
             val dataBuf = ByteBuffer.wrap(pkt, payOff, payLen)
             e.writeQueue.add(dataBuf)
             
             writePendingTcp(e)
-            ackTo(e)
+            if (e.writeQueue.isEmpty() || !shouldThrottle) {
+                ackTo(e)
+            }
         }
 
         if (fl and FIN != 0) {
@@ -1404,6 +1406,9 @@ class VpnWorker(private val vpnService: VpnService) {
                 bb.limit(originalLimit)
                 
                 if (written > 0) {
+                    sentTxBytesThisSecond += written.toLong()
+                    MyVpnService.totalTxBytes += written.toLong()
+                    checkDataCap(written)
                     if (pkg != null) addAppUsage(pkg, written.toLong())
                     if (shouldThrottle) {
                         if (appLimiter != null) {
@@ -1412,6 +1417,7 @@ class VpnWorker(private val vpnService: VpnService) {
                             ulTokens -= written
                         }
                     }
+                    ackTo(e)
                 }
                 
                 if (bb.hasRemaining()) {
@@ -1447,7 +1453,7 @@ class VpnWorker(private val vpnService: VpnService) {
             if (!e.ch.finishConnect()) return
             e.mySeq = System.nanoTime() and 0xFFFFFFFFL
             queueDownloadPacket(buildTcp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort,
-                e.mySeq, e.myAck, SYN or ACK, ByteArray(0)))
+                e.mySeq, e.myAck, SYN or ACK, ByteArray(0), e.packageName), e.packageName)
             e.mySeq++
             e.key?.interestOps(SelectionKey.OP_READ)
         } catch (ex: Exception) {
@@ -1509,8 +1515,6 @@ class VpnWorker(private val vpnService: VpnService) {
             if (n == 0) return
             buf.flip(); val data = ByteArray(n); buf.get(data)
             
-            MyVpnService.totalRxBytes += n
-            rxBytesThisSecond += n
             checkDataCap(n)
             if (inPkg != null) addAppUsage(inPkg, n.toLong())
 
@@ -1523,7 +1527,7 @@ class VpnWorker(private val vpnService: VpnService) {
                     }
                 } else if (downloadBps > 0) {
                     synchronized(this) {
-                        dlTokens = maxOf(-downloadBps, dlTokens - n)
+                        dlTokens = maxOf(-downloadBps / 4, dlTokens - n)
                         if (dlTokens <= 0) {
                             pauseTcpReader(e)
                         }
@@ -1532,7 +1536,7 @@ class VpnWorker(private val vpnService: VpnService) {
             }
 
             queueDownloadPacket(buildTcp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort,
-                e.mySeq, e.myAck, ACK or PSH, data), inPkg)
+                e.mySeq, e.myAck, ACK or PSH, data, inPkg), inPkg)
             e.mySeq += n
         } catch (ex: Exception) {
             Log.w(TAG, "TCP recv err: ${ex.message}")
@@ -1585,12 +1589,12 @@ class VpnWorker(private val vpnService: VpnService) {
 
     private fun ackTo(e: TcpEntry) {
         queueDownloadPacket(buildTcp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort,
-            e.mySeq, e.myAck, ACK, ByteArray(0)))
+            e.mySeq, e.myAck, ACK, ByteArray(0), e.packageName), e.packageName)
     }
 
     private fun finTo(e: TcpEntry) {
         queueDownloadPacket(buildTcp(e.dstAddr, e.srcAddr, e.dstPort, e.srcPort,
-            e.mySeq, e.myAck, FIN or ACK, ByteArray(0)))
+            e.mySeq, e.myAck, FIN or ACK, ByteArray(0), e.packageName), e.packageName)
         e.mySeq++
     }
 
@@ -2254,7 +2258,8 @@ class VpnWorker(private val vpnService: VpnService) {
     }
 
     private fun buildTcp(sA: ByteArray, dA: ByteArray, sP: Int, dP: Int,
-                         seq: Long, ack: Long, flags: Int, data: ByteArray): ByteArray {
+                         seq: Long, ack: Long, flags: Int, data: ByteArray,
+                         pkgOverride: String? = null): ByteArray {
         val ipH = if (sA.size == 4) 20 else 40
         val tcpH = 20
         val tot = ipH + tcpH + data.size
@@ -2278,7 +2283,21 @@ class VpnWorker(private val vpnService: VpnService) {
         w32(p, ipH + 4, seq); w32(p, ipH + 8, ack)
         p[ipH + 12] = (5 shl 4).toByte()
         p[ipH + 13] = flags.toByte()
-        w16(p, ipH + 14, 65535)
+
+        val effectiveLimit = when {
+            pkgOverride != null && appSpeedModes[pkgOverride] == "custom" && (appDlLimits[pkgOverride] ?: -1L) > 0L -> appDlLimits[pkgOverride]!!
+            downloadBps > 0L -> downloadBps
+            else -> -1L
+        }
+        val advWindow = when {
+            effectiveLimit <= 0L -> 65535
+            effectiveLimit <= 64 * 1024L -> 8192
+            effectiveLimit <= 128 * 1024L -> 16384
+            effectiveLimit <= 256 * 1024L -> 32768
+            effectiveLimit <= 1024 * 1024L -> 49152
+            else -> 65535
+        }
+        w16(p, ipH + 14, advWindow)
         if (data.isNotEmpty()) System.arraycopy(data, 0, p, ipH + tcpH, data.size)
         w16(p, ipH + 16, transportCksum(p, sA, dA, PROTO_TCP, ipH, tcpH + data.size))
         return p
@@ -2415,14 +2434,15 @@ class VpnWorker(private val vpnService: VpnService) {
 }
 
 class RateLimiter(var limitBps: Long) {
-    private var tokens: Long = if (limitBps > 0) minOf(limitBps, 16384L) else 0L
+    private val maxBurst get() = if (limitBps > 0) minOf(limitBps / 4, 32768L).coerceAtLeast(4096L) else 0L
+    private var tokens: Long = if (limitBps > 0) minOf(limitBps / 4, 32768L).coerceAtLeast(4096L) else 0L
     private var lastRefill: Long = System.currentTimeMillis()
 
     @Synchronized
     fun updateLimit(newLimitBps: Long) {
         limitBps = newLimitBps
         lastRefill = System.currentTimeMillis()
-        tokens = if (newLimitBps > 0) minOf(newLimitBps, 16384L) else 0L
+        tokens = maxBurst
     }
 
     @Synchronized
@@ -2430,7 +2450,7 @@ class RateLimiter(var limitBps: Long) {
         val now = System.currentTimeMillis()
         val dt = now - lastRefill
         if (dt > 0 && limitBps > 0) {
-            tokens = minOf(limitBps, tokens + (dt * limitBps) / 1000L)
+            tokens = minOf(maxBurst, tokens + (dt * limitBps) / 1000L)
             lastRefill = now
         }
     }
@@ -2457,7 +2477,7 @@ class RateLimiter(var limitBps: Long) {
     fun consumeTokens(bytes: Long) {
         if (limitBps > 0) {
             // Retain negative deficit so overdrawing tokens must be paid back before reading more!
-            tokens = maxOf(-limitBps, tokens - bytes)
+            tokens = maxOf(-maxBurst, tokens - bytes)
         }
     }
 }
