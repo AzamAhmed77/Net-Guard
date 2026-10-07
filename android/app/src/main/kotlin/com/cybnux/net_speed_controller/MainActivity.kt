@@ -96,6 +96,7 @@ class MainActivity: FlutterActivity() {
     override fun onResume() {
         super.onResume()
         instance = this
+        syncVpnStateFromNative()
     }
 
     fun toggleVpnFromNative() {
@@ -103,8 +104,9 @@ class MainActivity: FlutterActivity() {
     }
 
     fun syncVpnStateFromNative() {
+        val running = isServiceRunning()
         runOnUiThread {
-            flutterChannel?.invokeMethod("onVpnStateChanged", MyVpnService.isRunning)
+            flutterChannel?.invokeMethod("onVpnStateChanged", running)
         }
     }
 
@@ -317,21 +319,22 @@ class MainActivity: FlutterActivity() {
                             val pm = this@MainActivity.packageManager
                             val packages = pm.getInstalledPackages(0)
                             for (pkg in packages) {
-                                if (pkg.packageName == packageName) continue
+                                val isCurrentApp = (pkg.packageName == packageName)
                                 val appInfo = pkg.applicationInfo ?: continue
                                 val flags = appInfo.flags
                                 val isSystem = (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
                                 val launchIntent = pm.getLaunchIntentForPackage(pkg.packageName)
-                                if (launchIntent != null || !isSystem) {
+                                if (launchIntent != null || !isSystem || isCurrentApp) {
                                     val map = HashMap<String, Any>()
                                     map["packageName"] = pkg.packageName
-                                    map["appName"] = appInfo.loadLabel(pm).toString()
+                                    map["appName"] = if (isCurrentApp) "Net Guard" else appInfo.loadLabel(pm).toString()
                                     map["uid"] = appInfo.uid
+                                    map["isSystem"] = isSystem && !isCurrentApp
                                     
                                     val liveUsage = MyVpnService.instance?.getPerAppUsageMap() ?: emptyMap()
                                     val baseBytes = todayUidBytes[appInfo.uid] ?: 0L
                                     val liveBytes = liveUsage[pkg.packageName] ?: 0L
-                                    val realTodayBytes = baseBytes + liveBytes
+                                    val realTodayBytes = maxOf(baseBytes, liveBytes)
                                     map["totalMb"] = realTodayBytes.toDouble() / (1024.0 * 1024.0)
                                     
                                     cachedPackageUids[pkg.packageName] = appInfo.uid
@@ -568,7 +571,6 @@ class MainActivity: FlutterActivity() {
                                     } catch (_: Exception) {}
 
                                     for ((pkgName, uid) in cachedPackageUids) {
-                                        if (pkgName == packageName) continue
                                         val sysBytes = uidBytesMap[uid] ?: 0L
                                         if (sysBytes > 0L) {
                                             map[pkgName] = sysBytes.toDouble() / (1024.0 * 1024.0)
@@ -599,11 +601,10 @@ class MainActivity: FlutterActivity() {
                                     // Inject live real-time VPN packet counters directly from VpnWorker!
                                     val liveUsage = MyVpnService.instance?.getPerAppUsageMap() ?: emptyMap()
                                     for ((pkg, bytes) in liveUsage) {
-                                        if (pkg == packageName) continue
                                         val liveMb = bytes.toDouble() / (1024.0 * 1024.0)
                                         if (liveMb > 0.0) {
                                             val base = map[pkg] ?: 0.0
-                                            map[pkg] = base + liveMb
+                                            map[pkg] = maxOf(base, liveMb)
                                         }
                                     }
                                     runOnUiThread {
@@ -615,7 +616,6 @@ class MainActivity: FlutterActivity() {
 
                             // Fallback to TrafficStats if permission not granted
                             for ((pkgName, uid) in cachedPackageUids) {
-                                if (pkgName == packageName) continue
                                 val uidRx = android.net.TrafficStats.getUidRxBytes(uid)
                                 val uidTx = android.net.TrafficStats.getUidTxBytes(uid)
                                 if (uidRx > 0L || uidTx > 0L) {
@@ -629,11 +629,10 @@ class MainActivity: FlutterActivity() {
                         }
                         val liveUsage = MyVpnService.instance?.getPerAppUsageMap() ?: emptyMap()
                         for ((pkg, bytes) in liveUsage) {
-                            if (pkg == packageName) continue
                             val liveMb = bytes.toDouble() / (1024.0 * 1024.0)
                             if (liveMb > 0.0) {
                                 val base = map[pkg] ?: 0.0
-                                map[pkg] = base + liveMb
+                                map[pkg] = maxOf(base, liveMb)
                             }
                         }
                         runOnUiThread {
@@ -794,7 +793,6 @@ class MainActivity: FlutterActivity() {
                                             val pkgs = pm.getPackagesForUid(uid)
                                             if (pkgs != null && pkgs.isNotEmpty()) {
                                                 for (pkg in pkgs) {
-                                                    if (pkg == packageName) continue
                                                     appUsageMap[pkg] = (appUsageMap[pkg] ?: 0.0) + mb
                                                 }
                                             } else {
@@ -1067,7 +1065,6 @@ class MainActivity: FlutterActivity() {
                                             val pkgs = pm.getPackagesForUid(uid)
                                             if (pkgs != null && pkgs.isNotEmpty()) {
                                                 for (pkg in pkgs) {
-                                                    if (pkg == packageName) continue
                                                     wifiMap[pkg] = (wifiMap[pkg] ?: 0.0) + mb
                                                 }
                                             } else {
@@ -1152,7 +1149,6 @@ class MainActivity: FlutterActivity() {
                                             val pkgs = pm.getPackagesForUid(uid)
                                             if (pkgs != null && pkgs.isNotEmpty()) {
                                                 for (pkg in pkgs) {
-                                                    if (pkg == packageName) continue
                                                     mobileMap[pkg] = (mobileMap[pkg] ?: 0.0) + mb
                                                 }
                                             } else {
@@ -1169,7 +1165,6 @@ class MainActivity: FlutterActivity() {
                                     val isWifiActive = isWifiConnected()
 
                                     for ((pkg, bytes) in liveUsage) {
-                                        if (pkg == packageName) continue
                                         val mb = bytes.toDouble() / (1024.0 * 1024.0)
                                         if (mb > 0.0) {
                                             if (isWifiActive) {
@@ -1223,8 +1218,7 @@ class MainActivity: FlutterActivity() {
                             if (monCell > totalMobileBytes) totalMobileBytes = monCell
                         }
 
-                        wifiMap.remove(packageName)
-                        mobileMap.remove(packageName)
+                        // Keep packageName so Net Guard usage is accurately and transparently tracked!
 
                         val totalWifiMb = totalWifiBytes.toDouble() / (1024.0 * 1024.0)
                         val totalMobileMb = totalMobileBytes.toDouble() / (1024.0 * 1024.0)

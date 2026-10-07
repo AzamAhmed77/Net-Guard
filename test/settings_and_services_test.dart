@@ -140,5 +140,31 @@ void main() {
       expect(sched['endMinute'], 15);
       expect(sched['action'], 'eco');
     });
+
+    test('Net Guard package representation in AppInfo and data usage transparency', () {
+      final netGuardApp = AppInfo(
+        name: 'Net Guard',
+        packageName: 'com.cybnux.net_speed_controller',
+        totalMb: 12.5,
+        isSystem: true,
+      );
+      expect(netGuardApp.packageName, 'com.cybnux.net_speed_controller');
+      expect(netGuardApp.totalMb, 12.5);
+      expect(netGuardApp.isEffectivelyBlocked, isFalse);
+    });
+
+    test('VpnConfig preserves vpnActive sync state on update', () async {
+      final config = VpnConfig(isVpnActive: false);
+      expect(config.isVpnActive, isFalse);
+      config.isVpnActive = true;
+      await StorageService.saveConfig(config);
+      final reloaded = await StorageService.loadConfig();
+      expect(reloaded?.isVpnActive, isTrue);
+
+      config.isVpnActive = false;
+      await StorageService.saveConfig(config);
+      final reloaded2 = await StorageService.loadConfig();
+      expect(reloaded2?.isVpnActive, isFalse);
+    });
   });
 }

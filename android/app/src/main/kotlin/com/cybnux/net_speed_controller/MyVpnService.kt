@@ -567,6 +567,7 @@ class MyVpnService : VpnService() {
             instance = this
             setVpnActiveState(this, true)
             NetworkMonitorService.instance?.forceImmediateSpeedUpdate()
+            MainActivity.instance?.syncVpnStateFromNative()
 
         } catch (e: Exception) {
             Log.e(TAG, "Error starting VPN: ${e.message}")
@@ -736,6 +737,7 @@ Speed reduced to minimum survival speed (1 KB/s)."""
         setVpnActiveState(this, false)
         Log.i(TAG, "VPN Service fully stopped")
         NetworkMonitorService.instance?.forceImmediateSpeedUpdate()
+        MainActivity.instance?.syncVpnStateFromNative()
         stopSelf()
     }
 

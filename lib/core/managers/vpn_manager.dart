@@ -263,17 +263,21 @@ class VpnManager extends ChangeNotifier {
 
     MethodChannelService.initializeChannelCallbacks();
     MethodChannelService.onVpnStateChanged = (bool isRunning) {
-      config.isVpnActive = isRunning;
-      _persistState();
-      notifyListeners();
+      if (config.isVpnActive != isRunning) {
+        config.isVpnActive = isRunning;
+        _persistState();
+        notifyListeners();
+      }
     };
     MethodChannelService.onVpnToggledFromNotification = () async {
-      final isRunning = await MethodChannelService.isVpnRunning();
-      config.isVpnActive = isRunning;
-      _persistState();
-      notifyListeners();
+      await syncNativeVpnState();
     };
     try {
+      final running = await MethodChannelService.isVpnRunning();
+      if (config.isVpnActive != running) {
+        config.isVpnActive = running;
+        _persistState();
+      }
       _isMonitorRunning = await MethodChannelService.isMonitorRunning();
       _isSpikeAlertEnabled = await MethodChannelService.isSpikeAlertEnabled();
     } catch (_) {}
@@ -1137,6 +1141,18 @@ class VpnManager extends ChangeNotifier {
       _isLoadingApps = false;
       notifyListeners();
     }
+  }
+
+  Future<void> syncNativeVpnState() async {
+    try {
+      final running = await MethodChannelService.isVpnRunning();
+      if (config.isVpnActive != running) {
+        config.isVpnActive = running;
+        _persistState();
+        notifyListeners();
+      }
+      await refreshHotspotStatus();
+    } catch (_) {}
   }
 
   Future<void> toggleVpn() async {

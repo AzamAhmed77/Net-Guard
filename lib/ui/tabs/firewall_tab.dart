@@ -764,6 +764,17 @@ class _FirewallTabState extends State<FirewallTab> {
                     icon: Icons.wifi,
                     isActive: app.isWifiAllowed,
                     onTap: () {
+                      if (app.packageName == 'com.cybnux.net_speed_controller') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(vpn.isArabic
+                                ? 'نت جارد هو تطبيق الحماية الأساسي ولا يمكن تعطيل اتصاله.'
+                                : 'Net Guard is the guardian core and cannot be disconnected.'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
                       vpn.toggleAppWifi(app);
                       setState(() {});
                     },
@@ -775,6 +786,17 @@ class _FirewallTabState extends State<FirewallTab> {
                     icon: Icons.network_cell,
                     isActive: app.isMobileAllowed,
                     onTap: () {
+                      if (app.packageName == 'com.cybnux.net_speed_controller') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(vpn.isArabic
+                                ? 'نت جارد هو تطبيق الحماية الأساسي ولا يمكن تعطيل اتصاله.'
+                                : 'Net Guard is the guardian core and cannot be disconnected.'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
                       vpn.toggleAppMobile(app);
                       setState(() {});
                     },

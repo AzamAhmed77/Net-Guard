@@ -582,8 +582,11 @@ ${appLabel ?: "Data"} consumed $consumedMb MB in the last few minutes. Tap to ma
                     action = MyVpnService.ACTION_STOP
                 }
                 startService(stopIntent)
-                // Also notify Flutter UI if open
-                MainActivity.instance?.toggleVpnFromNative()
+                MyVpnService.setVpnActiveState(this, false)
+                handler.postDelayed({
+                    MainActivity.instance?.syncVpnStateFromNative()
+                    updateNotification(force = true)
+                }, 150)
             } else {
                 // 2. Direct native start from saved preferences
                 val startIntent = MyVpnService.buildStartIntentFromPrefs(this)

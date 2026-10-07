@@ -54,16 +54,20 @@ class VpnActionReceiver : BroadcastReceiver() {
                 Log.e(TAG, "Error in VpnActionReceiver: ${e.message}", e)
             }
 
-            // Sync with Flutter UI if active
-            MainActivity.instance?.syncVpnStateFromNative()
-
-            // Refresh the notification after a brief pause so service status settles
+            // Refresh notification and state with safe delays so service status settles
             Handler(Looper.getMainLooper()).postDelayed({
-                NetworkMonitorService.instance?.updateNotification(force = true)
                 MainActivity.instance?.syncVpnStateFromNative()
+                NetworkMonitorService.instance?.updateNotification(force = true)
                 NetGuardTileService.requestTileUpdate(context)
                 NetGuardWidgetProvider.updateAllWidgets(context)
-            }, 300)
+            }, 100)
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                MainActivity.instance?.syncVpnStateFromNative()
+                NetworkMonitorService.instance?.updateNotification(force = true)
+                NetGuardTileService.requestTileUpdate(context)
+                NetGuardWidgetProvider.updateAllWidgets(context)
+            }, 400)
         }
     }
 }

@@ -590,6 +590,12 @@ class _UsageTabState extends State<UsageTab> {
             packageName: pkg,
             isSystem: true,
           ));
+        } else if (pkg == 'com.cybnux.net_speed_controller') {
+          allApps.add(AppInfo(
+            name: vpn.isArabic ? 'نت جارد (تطبيق الحماية)' : 'Net Guard (Guardian App)',
+            packageName: pkg,
+            isSystem: true,
+          ));
         } else {
           allApps.add(AppInfo(
             name: pkg,

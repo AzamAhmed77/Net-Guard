@@ -59,6 +59,7 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
       manager.pauseTrafficTicker();
     } else if (state == AppLifecycleState.resumed) {
       manager.resumeTrafficTicker();
+      manager.syncNativeVpnState();
     }
   }
 
