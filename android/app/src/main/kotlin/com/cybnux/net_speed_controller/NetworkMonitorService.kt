@@ -425,6 +425,7 @@ ${appLabel ?: "Data"} consumed $consumedMb MB in the last few minutes. Tap to ma
         }
 
         val notif = NotificationCompat.Builder(this, ALERTS_CHANNEL_ID)
+            .setColor(Color.parseColor("#0d111a"))
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
@@ -549,6 +550,7 @@ ${appLabel ?: "Data"} consumed $consumedMb MB in the last few minutes. Tap to ma
             .setContentTitle(line1)
             .setContentText(line2)
             .setSubText(subText)
+            .setColor(Color.parseColor("#0d111a"))
             .setSmallIcon(R.drawable.ic_notification)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(remoteViews)

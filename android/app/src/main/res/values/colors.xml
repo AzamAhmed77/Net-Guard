@@ -1,6 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#0d111a</color>
-    <color name="notif_text_primary">#111111</color>
-    <color name="notif_text_secondary">#555555</color>
+    <color name="launch_background_color">#121214</color>
+    <color name="window_background_dark">#121214</color>
+    <color name="notif_text_primary">#FFFFFF</color>
+    <color name="notif_text_secondary">#94A3B8</color>
 </resources>

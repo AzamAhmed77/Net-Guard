@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 class AppTheme {
@@ -25,26 +25,6 @@ class AppTheme {
     );
   }
 
-  static ThemeData get lightTheme {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.light,
-      scaffoldBackgroundColor: AppColors.bgLight,
-      primaryColor: AppColors.primary,
-      colorScheme: ColorScheme.light(
-        primary: AppColors.primary,
-        secondary: AppColors.accent,
-        surface: AppColors.surfaceLight,
-        error: AppColors.red,
-      ),
-      fontFamily: 'sans-serif',
-      cardTheme: CardThemeData(
-        color: AppColors.surfaceCardLight,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppColors.borderLight, width: 1),
-        ),
-      ),
-    );
-  }
+  /// All themes fallback strictly to the unified premium dark design
+  static ThemeData get lightTheme => darkTheme;
 }

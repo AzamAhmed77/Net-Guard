@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import android.graphics.Color
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import java.io.FileDescriptor
@@ -599,6 +600,7 @@ class MyVpnService : VpnService() {
         )
 
         val builder = NotificationCompat.Builder(this, NetworkMonitorService.ALERTS_CHANNEL_ID)
+            .setColor(Color.parseColor("#0d111a"))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
@@ -638,6 +640,7 @@ Remaining: $remainingMb MB."""
         )
 
         val builder = NotificationCompat.Builder(this, NetworkMonitorService.ALERTS_CHANNEL_ID)
+            .setColor(Color.parseColor("#0d111a"))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
@@ -750,6 +753,7 @@ Speed reduced to minimum survival speed (1 KB/s)."""
             )
 
             NotificationCompat.Builder(this, CHANNEL_ID)
+                .setColor(Color.parseColor("#0d111a"))
                 .setContentTitle("Net Guard")
                 .setContentText("Network Guardian Active")
                 .setSmallIcon(R.drawable.ic_notification)
